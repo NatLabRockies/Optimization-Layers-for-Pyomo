@@ -4,7 +4,7 @@ import torch.nn as nn
 import sys
 sys.path.append('..')  # Add the parent directory to Python's search path
 import pyomo.environ as pyo
-from pyomo.opt import SolverFactory, TerminationCondition
+from pyomo.opt import TerminationCondition
 import copy
 from utilities import get_sen
 torch.set_default_dtype(torch.float64)
@@ -19,12 +19,8 @@ class PyomoOptLayer(nn.Module):
             The function of creating the Pyomo model. The input is the parameter value and the output is the concrete Pyomo model.
         - variables_name (``List[str]``, required)
             A list of variable name defined in Pyomo.
-        # - variables_size (``Dict[str: List[int]]``, required)
-        #     A dict of variable name (key) and the size (value). 
         - parameters_name(``List[str]``, required)
             A list of parameter name defined in Pyomo.
-        # - parameters_size (``Dict[str: List[int]]``, required)
-        #     A dict of parameter name (key) and the size (value). 
         - grad_parameters_name(``List[str]``, optional)
             A list of parameter name defined in Pyomo, a subset of parameters_name. By setting to ``None``, grad_parameters_name = parameters_name.
         - solver (``str`` , optional)
@@ -56,11 +52,6 @@ class PyomoOptLayer(nn.Module):
         self.init_pyomo_varorder()
 
     def init_pyomo_varorder(self):
-        # sorted_vars_obj = []           
-        # for v_name in self.variables_name:
-        #     v = getattr(self.concrete_model, v_name)
-        #     sorted_vars_obj.append(v)
-
         self.parameters_size = {}
         for var in self.concrete_model.component_objects(pyo.Var, active=True):
             # Scaler
@@ -76,8 +67,7 @@ class PyomoOptLayer(nn.Module):
             var_index = self.concrete_model.component(var)
             # Retrieve indexed names
             self.variables_name_index += [var_index[i].name for i in var_index.keys()]
-        # for var in sorted_vars_obj:
-        #     self.concrete_model.add_component(var.name, var)
+
 
     def forward(self, *batch_params):
         """
@@ -172,27 +162,9 @@ def PyomoLayerFn(concrete_model, variables_name, variables_name_index, parameter
                     duals = torch.tensor(duals).type_as(params[0]).view(-1)
 
                     vars = []
-                    vars_obj = []
-
                     for v_name in variables_name:
-                        v = getattr(concrete_model, v_name)
-                        vars_obj.append(v)
-                        var_size = copy.deepcopy(parameters_size[v_name])
-                        if len(var_size) == 2:
-                            for i in range(var_size[0]):
-                                for j in range(var_size[1]):
-                                    vars.append(v[i, j].value)  
-                        elif len(var_size) == 1:
-                            v_dim = len(v)
-                            if v_dim == 1:
-                                try:
-                                    vars.append(v.value) 
-                                except:
-                                    vars.append(v[0].value)
-                            else:
-                                for j in range(v_dim):
-                                    vars.append(v[j].value)  
-
+                        var = concrete_model.component(v_name) 
+                        vars  += [var[i].value for i in var]
                     vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(True)
                     
                 if batch == 0:
@@ -223,15 +195,10 @@ def PyomoLayerFn(concrete_model, variables_name, variables_name_index, parameter
                     grad_reshape.append(None)
                     continue
                 size = copy.deepcopy(parameters_size[p])
-                if len(size) == 3:
-                    length = size[0] * size[1] * size[2]
-                elif len(size) == 2:
-                    length = size[0] * size[1]
-                else:
-                    length = size[0] 
+                param_length = len(list(concrete_model.component(p).keys()))
                 size.insert(0, batch_size)
-                grad_reshape.append(grad[:, start:start+length].reshape(size))
-                start += length
+                grad_reshape.append(grad[:, start:start+param_length].reshape(size))
+                start += param_length
             grad_reshape = tuple(grad_reshape)
             return *grad_reshape, None
 
