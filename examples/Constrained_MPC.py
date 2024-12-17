@@ -5,7 +5,11 @@
 
 # %%
 import sys
-sys.path.append('/projects/drl4dsr/kchen2/PyomoLayer')  # Add the parent directory to Python's search path
+import os
+current_dir = os.getcwd()
+sys.path.append(current_dir) # Add the parent directory to Python's search path
+results_dir = os.path.join(current_dir, "examples/results")
+
 import pyomo.environ as pyo
 import numpy as np
 from pyomolayer import PyomoOptLayer
@@ -215,8 +219,9 @@ def plot_weights(weights_tch, weights_np):
     plt.ylabel(r'$\theta_i$')
     plt.legend()
     plt.tight_layout()
-    plt.savefig("PyomoLayer/examples/results/weight_CMPC.png", dpi=300, bbox_inches='tight')
-
+    plt.savefig(os.path.join(results_dir, "weight_CMPC.png"), dpi=300, bbox_inches='tight')
+    plt.close()
+    
 def plot_losses(val_nn_losses, val_losses, true_mse):
     fig = plt.figure()
     fig.set_size_inches((10, 3))
@@ -228,7 +233,8 @@ def plot_losses(val_nn_losses, val_losses, true_mse):
     plt.ylabel('validation loss')
     plt.legend(loc='upper right')
     plt.tight_layout()
-    plt.savefig("PyomoLayer/examples/results/loss_CMPC.png", dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, "loss_CMPC.png"), dpi=300, bbox_inches='tight')
+    plt.close()
 
 def main():
     global A, B, A_np, B_np, beta, m, n, T, weights, weights_np
@@ -355,6 +361,7 @@ def main():
 
     plt.tight_layout()
     plt.show()
-    plt.savefig("PyomoLayer/examples/results/CMPC.png", dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, "CMPC.png"), dpi=300, bbox_inches='tight')
+    plt.close()
 if __name__ == "__main__":
     main()
