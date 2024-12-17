@@ -37,7 +37,11 @@
 
 # %%
 import sys
-sys.path.append('/projects/drl4dsr/kchen2/PyomoLayer')  # Add the parent directory to Python's search path
+import os
+current_dir = os.getcwd()
+sys.path.append(current_dir) # Add the parent directory to Python's search path
+results_dir = os.path.join(current_dir, "examples/results")
+
 import pyomo.environ as pyo
 import numpy as np
 from pyomolayer import PyomoOptLayer
@@ -170,13 +174,13 @@ def main():
         results.append(loss.item())
         print("(iter %d) loss: %g " % (i, results[-1]))
 
-    np.save("cadp_results", results)
-    cadp_cvx_results = np.load("/kfs2/projects/drl4dsr/kchen2/pyomolayer/cvxpylayers/examples/torch/cadp_cvx_results.npy")
+    np.save(os.path.join(results_dir, "cadp_results"), results)
+    cadp_cvx_results = np.load(os.path.join(results_dir, "cadp_cvx_results.npy"))
     plt.plot(results, label = "Pyomo")
     plt.plot(cadp_cvx_results, label = "CVX")
     plt.legend()
-    plt.savefig("PyomoLayer/examples/results/loss_CADP.png", dpi=300, bbox_inches='tight')
-
+    plt.savefig(os.path.join(results_dir, "loss_CADP.png"), dpi=300, bbox_inches='tight')
+    plt.close()
 if __name__ == "__main__":
     main()
 
