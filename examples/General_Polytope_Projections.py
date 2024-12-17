@@ -10,7 +10,11 @@
 
 # %%
 import sys
-sys.path.append('/Users/kchen2/Opt_Layer')  # Add the parent directory to Python's search path
+import os
+current_dir = os.getcwd()
+sys.path.append(current_dir) # Add the parent directory to Python's search path
+results_dir = os.path.join(current_dir, "examples/results")
+
 import pyomo.environ as pyo
 import numpy as np
 from pyomolayer import PyomoOptLayer
@@ -133,7 +137,8 @@ def main():
 
     plot_polytope(layer.G, layer.h, "red", "NN optimal poly")
     plt.axis('equal')
-    plt.savefig("examples/results/General_Polytope_Projections.png", dpi=300, bbox_inches='tight')
-
+    plt.savefig(os.path.join(results_dir, "General_Polytope_Projections.png"), dpi=300, bbox_inches='tight')
+    plt.close()
+    
 if __name__ == "__main__":
     main()
