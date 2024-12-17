@@ -203,15 +203,14 @@ def get_sen(concrete_model, parameters_name, parameters_size, variables_name_ind
     Args:
         - concrete_model (``Pyomo model``, required)
             The concrete instance has been solved by IPOPT, and the optimal values of primal and dual variables have been obtained.
-        - vars_obj (``List[objective]``, required)
-            A list of variable object obatined by v_obj = getattr(concrete_model, v_name).
         - parameters_name(``List[str]``, required)
             A list of parameter name defined in Pyomo.
         - parameters_size (``Dict[str: List[int]]``, required)
             A dict of parameter name (key) and the size (value). 
-    
+        - variables_name_index(``List[str]``, required)
+            A list of indexed variable names
     Returns:
-        The sensitivity matrix, left hand side of KKT matrix, right hand side of vector.
+        The sensitivity matrix, left hand side of KKT matrix, right hand side of vector, and the order of variables
     
     Return type:
         Matrix.
@@ -219,11 +218,10 @@ def get_sen(concrete_model, parameters_name, parameters_size, variables_name_ind
     Examples:
         >>> concrete_model = pyo.ConcreteModel()
         >>> solver.solve(concrete_model, tee=False)
-        >>> variables_name = ["x"]
-        >>> variables_size = {'x':[n]}
         >>> parameters_name = ["Psqrt", "q", "A", "b"]
         >>> parameters_size = {'Psqrt':[n, n], 'q':[n], "A" : [m, n], "b" : [m]}
-        >>> dvar_dp, lhs_Jac, rhs_Jac = get_sen(concrete_model, variables_name, vars_obj, variables_size, parameters_name, parameters_size)
+        >>> variables_name_index = ["x[0]", "x[1]", "x[3]", "y"]
+        >>> dvar_dp, lhs_Jac, rhs_Jac, variables_index_order = get_sen(concrete_model, parameters_name, parameters_size, variables_name_index)
     """
     nlp = PyomoNLP(concrete_model)
     variables_name_full = []
@@ -238,9 +236,9 @@ def get_sen(concrete_model, parameters_name, parameters_size, variables_name_ind
             v = getattr(concrete_model, var_name)
             vars_obj.append(v)
     
-    variables_nameindex = []
+    variables_index_order = []
     for var in variables_name_index:
-        variables_nameindex.append(variables_nameindex_full.index(var))
+        variables_index_order.append(variables_nameindex_full.index(var))
 
     ineq_duals = []
     duals = []
@@ -312,4 +310,4 @@ def get_sen(concrete_model, parameters_name, parameters_size, variables_name_ind
     kkt_rhs.set_block(3, 0, H_ineq)
     ds = spsolve(kkt.tocsc(), -kkt_rhs.tocsc())
     dfullvar_dp = np.array(ds.todense())[:len(variables_nameindex_full), :]
-    return dfullvar_dp, kkt.tocsc().todense(), kkt_rhs.tocsc().todense(), variables_nameindex
+    return dfullvar_dp, kkt.tocsc().todense(), kkt_rhs.tocsc().todense(), variables_index_order
