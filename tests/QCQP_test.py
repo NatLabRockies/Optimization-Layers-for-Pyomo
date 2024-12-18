@@ -10,7 +10,11 @@
 # with the variable $\mathbf{x}$ and parameter $\mathbf{p}$.
 # %%
 import sys
-sys.path.append('/projects/drl4dsr/kchen2/PyomoLayer')  # Add the parent directory to Python's search path
+import os
+current_dir = os.getcwd()
+sys.path.append(current_dir) # Add the parent directory to Python's search path
+results_dir = os.path.join(current_dir, "tests/results")
+
 import pyomo.environ as pyo
 import numpy as np
 from pyomolayer import PyomoOptLayer
@@ -239,13 +243,13 @@ def calculate_error(actual, predicted):
 
 def grad_diff(n: int = 1, p: int = 1, sample_num: int = 32, batch_size: int = 32, alg: str = "pyomo", val_seed: int = 0):
     PsqrtG, qvalG, AvalG, bvalG, dvalG, pyomo_time, primal, duals = QP_grad_pyomo(n, p, sample_num, batch_size, alg = "pyomo", val_seed=val_seed)
-    np.save("QCQP_PsqrtG.npy", PsqrtG)
-    np.save("QCQP_qvalG.npy", qvalG)
-    np.save("QCQP_AvalG.npy", AvalG)
-    np.save("QCQP_bvalG.npy", bvalG)
-    np.save("QCQP_dvalG.npy", dvalG)
-    np.save("QCQP_primal.npy", primal)
-    np.save("QCQP_dual.npy", duals)
+    np.save(os.path.join(results_dir, "QCQP_PsqrtG.npy"), PsqrtG)
+    np.save(os.path.join(results_dir, "QCQP_qvalG.npy"), qvalG)
+    np.save(os.path.join(results_dir, "QCQP_AvalG.npy"), AvalG)
+    np.save(os.path.join(results_dir, "QCQP_bvalG.npy"), bvalG)
+    np.save(os.path.join(results_dir, "QCQP_dvalG.npy"), dvalG)
+    np.save(os.path.join(results_dir, "QCQP_primal.npy"), primal)
+    np.save(os.path.join(results_dir, "QCQP_dual.npy"), duals)
 
     PsqrtG_ref, qvalG_ref, AvalG_ref, bvalG_ref, dvalG_ref, cvxpy_time, primal_ref, _ = QP_grad_pyomo(n, p, sample_num, batch_size, alg = "cvxpy", val_seed=val_seed)
     duals_ref = get_duals(n, p, sample_num, val_seed)

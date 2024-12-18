@@ -25,7 +25,11 @@
 
 # %%
 import sys
-sys.path.append('/Users/kchen2/Opt_Layer')  # Add the parent directory to Python's search path
+import os
+current_dir = os.getcwd()
+sys.path.append(current_dir) # Add the parent directory to Python's search path
+results_dir = os.path.join(current_dir, "examples/results")
+
 import pyomo.environ as pyo
 import numpy as np
 from pyomolayer import PyomoOptLayer
@@ -149,6 +153,7 @@ def main():
         loss.backward()
         training_loss.append(loss.item())
         opt.step()
-    np.save("ReLU_training_loss", training_loss)
+        
+    np.save(os.path.join(results_dir, "ReLU_training_loss"), training_loss)
 if __name__ == "__main__":
     main()
