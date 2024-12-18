@@ -5,7 +5,11 @@
 
 # %%
 import sys
-sys.path.append('/Users/kchen2/Opt_Layer')  # Add the parent directory to Python's search path
+import os
+current_dir = os.getcwd()
+sys.path.append(current_dir) # Add the parent directory to Python's search path
+results_dir = os.path.join(current_dir, "examples/results")
+
 import pyomo.environ as pyo
 import numpy as np
 from pyomolayer import PyomoOptLayer
@@ -220,7 +224,7 @@ def main():
     ax.axhline(one_param_mse, linestyle='-.', label='least squares')
     plt.legend()
     plt.tight_layout()
-    plt.savefig("examples/results/signal_denoising_val_loss.png", dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, "signal_denoising_val_loss.png"), dpi=300, bbox_inches='tight')
 
     plt.figure(figsize=(10., 3.5))
     plt.plot(X_val[sample_idx], label='input', color='silver', linestyle='-.')
@@ -231,7 +235,7 @@ def main():
     plt.ylabel('$y_i$')
     plt.legend(loc='lower left')
     plt.tight_layout()
-    plt.savefig("examples/results/signal_denoising.png", dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, "signal_denoising.png"), dpi=300, bbox_inches='tight')
     plt.show()
 
 if __name__ == "__main__":
