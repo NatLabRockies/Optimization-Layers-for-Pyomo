@@ -1,0 +1,194 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Algorithm Module &mdash; Optimization Layer 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=e031e9a9"></script>
+      <script src="_static/doctools.js?v=888ff710"></script>
+      <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Utilities Module" href="utilities.html" />
+    <link rel="prev" title="Optimization Layer documentation" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Optimization Layer
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Algorithm Module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#algorithms.fit"><code class="docutils literal notranslate"><span class="pre">fit()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="utilities.html">Utilities Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pyomolayer.html">Optimization Layer Module</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Optimization Layer</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Algorithm Module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/algorithms.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="algorithm-module">
+<h1>Algorithm Module<a class="headerlink" href="#algorithm-module" title="Permalink to this heading"></a></h1>
+<span class="target" id="module-algorithms"></span><dl class="py function">
+<dt class="sig sig-object py" id="algorithms.fit">
+<span class="sig-prename descclassname"><span class="pre">algorithms.</span></span><span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loss</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Xval</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Yval</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">opt=&lt;class</span> <span class="pre">'torch.optim.adam.Adam'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">opt_kwargs={'lr':</span> <span class="pre">0.001}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_size=128</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epochs=100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback=None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#algorithms.fit" title="Permalink to this definition"></a></dt>
+<dd><p>Description:
+The function aims to minimize the loss of <span class="math notranslate nohighlight">\(X\)</span> and <span class="math notranslate nohighlight">\(Y\)</span> by updating the parameters using the gradient descent algorithm.</p>
+<dl>
+<dt>Args:</dt><dd><ul class="simple">
+<li><dl class="simple">
+<dt>loss (required):</dt><dd><p>A criterion that measures the difference between <span class="math notranslate nohighlight">\(X\)</span> and target <span class="math notranslate nohighlight">\(Y\)</span>. The output is a scalar by default for backpropagation.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>params (<code class="docutils literal notranslate"><span class="pre">List[Tensor]</span></code>, required): </dt><dd><p>A list of parameters to optimize.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>X and Y (<code class="docutils literal notranslate"><span class="pre">Tensor</span></code>, required):</dt><dd><p>Input and output tensors of training dataset.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Xval and Yval (<code class="docutils literal notranslate"><span class="pre">Tensor</span></code>, required):</dt><dd><p>Input and output tensors of validation dataset.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>opt (<code class="docutils literal notranslate"><span class="pre">Pytorch</span> <span class="pre">optimizer</span></code>, optional): </dt><dd><p>Pytorch optimizer is an optimization technique for gradient descent. Default: torch.optim.Adam.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>opt_kwargs (<code class="docutils literal notranslate"><span class="pre">Dict[str,</span> <span class="pre">any]</span></code>, optional):</dt><dd><p>A dict containing default values of optimization options. The default value for learning rate (float) is <span class="math notranslate nohighlight">\(10^{-3}\)</span>.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>batch_size (<code class="docutils literal notranslate"><span class="pre">int</span></code>, optional): </dt><dd><p>Training mini-batch size. Default: 128.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>epochs (<code class="docutils literal notranslate"><span class="pre">int</span></code>, optional): </dt><dd><p>Training epochs. Default: 100.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>verbose (<code class="docutils literal notranslate"><span class="pre">bool</span></code>, optional): </dt><dd><p>If set to True, display the training loss for each epoch. Default: False.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>callback (<code class="docutils literal notranslate"><span class="pre">PyTorch</span> <span class="pre">callback</span></code>, optional): </dt><dd><p>PyTorch callback is a function triggered at specific points during model training. Default: None.</p>
+</dd>
+</dl>
+</li>
+</ul>
+</dd>
+<dt>Shape:</dt><dd><ul class="simple">
+<li><p>X: <span class="math notranslate nohighlight">\((*, )\)</span> where <span class="math notranslate nohighlight">\(*\)</span> means any number of dimensions.</p></li>
+<li><p>Y: <span class="math notranslate nohighlight">\((*, )\)</span> where the first dimension is the same shape as X.</p></li>
+<li><p>Xval: <span class="math notranslate nohighlight">\((**, )\)</span> where <span class="math notranslate nohighlight">\(**\)</span> means any number of dimensions.</p></li>
+<li><p>Yval: <span class="math notranslate nohighlight">\((**, )\)</span> where the first dimension is the same shape as Xval.</p></li>
+</ul>
+</dd>
+<dt>Returns:</dt><dd><p>A list of validation loss for each epoch, a list of training loss for each epoch.</p>
+</dd>
+<dt>Return type:</dt><dd><p><code class="docutils literal notranslate"><span class="pre">List[loss</span> <span class="pre">scalar]</span></code>, <code class="docutils literal notranslate"><span class="pre">List[loss</span> <span class="pre">scalar]</span></code>.</p>
+</dd>
+<dt>Raises:</dt><dd><p>ExceptionName: Description of the error raised, if any.</p>
+</dd>
+<dt>Examples:</dt><dd><div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">val_losses</span><span class="p">,</span> <span class="n">train_losses</span> <span class="o">=</span> <span class="n">example_function</span><span class="p">(</span><span class="n">loss</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">Xval</span><span class="p">,</span> <span class="n">Yval</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">opt_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;lr&quot;</span><span class="p">:</span><span class="mf">1e-3</span><span class="p">},</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Optimization Layer documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="utilities.html" class="btn btn-neutral float-right" title="Utilities Module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Alliance for Sustainable Energy, LLC.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
