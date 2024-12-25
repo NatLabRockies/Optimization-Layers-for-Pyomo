@@ -154,9 +154,9 @@ def main():
     variables = [P_sqrt, P_21, q]
     A_tch, B_tch, Q_tch, R_tch = map(torch.from_numpy, [A, B, Q, R])
 
-    variables_name = ["u"]
+    variables_name = [model.u]
     # variables_size = {'u':[m, 1], "y":[n, 1]}
-    parameters_name = ["q", "P21", "Psqrt", "x"]
+    parameters_name = [model.q, model.P21, model.Psqrt, model.x]
     # parameters_size = {'q':[m, 1], "P21" : [n, m], "Psqrt" : [m, m], "x": [n, 1]}
     model = model_instance()
     Pyomolayer = PyomoOptLayer(model, variables_name, parameters_name, solver = 'ipopt')
