@@ -171,11 +171,10 @@ def main():
     X_val = inputs[N_train:]
     Y_val = outputs[N_train:]
 
-    variables_name = ["y_cp"]
-    variables_size = {'y_cp':[n], "x_minus_y":[n]}
-    parameters_name = ["theta_param", "x_param", "lambda_param"]
-    parameters_size = {"theta_param":[n, n], 'x_param':[n], "lambda_param":[1]}
     model = model_instance()
+    variables_name = [model.y_cp]
+    parameters_name = [model.theta_param, model.x_param, model.lambda_param]
+    
     Pyomolayer = PyomoOptLayer(model, variables_name, parameters_name, solver = 'ipopt')
 
     params = [theta_tch, lambda_tch]
@@ -189,11 +188,9 @@ def main():
     with torch.no_grad():
         val_preds = Pyomolayer(theta_tch.repeat(X_val.shape[0], 1, 1), X_val, lambda_tch.repeat(X_val.shape[0], 1))
 
-    variables_name = ["y_cp"]
-    variables_size = {'y_cp':[n], "x_minus_y":[n]}
-    parameters_name = ["x_param", "lambda_param"]
-    parameters_size = {'x_param':[n], "lambda_param":[1]}
     model_withouttheta = model_instance_withouttheta()
+    variables_name = [model_withouttheta.y_cp]
+    parameters_name = [model_withouttheta.x_param, model_withouttheta.lambda_param]    
     Pyomolayer_withouttheta = PyomoOptLayer(model_withouttheta, variables_name, parameters_name, solver = 'ipopt')
 
     lambda_values = torch.linspace(1e-5, 20, 10)
