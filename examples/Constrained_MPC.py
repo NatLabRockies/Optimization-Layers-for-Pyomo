@@ -261,11 +261,10 @@ def main():
 
     opt = torch.optim.Adam([weights_tch], lr=learning_rate)
 
-    variables_name = ["controls"]
-    variables_size = {'controls':[T, m], "states":[T, n]}
-    parameters_name = ["x"]
-    parameters_size = {"x": [n]}
     model = model_instance()
+    variables_name = [model.controls]
+    parameters_name = [model.x]
+    
     Pyomolayer = PyomoOptLayer(model, variables_name, parameters_name, solver = 'ipopt')
 
     states, controls, costs = simulate(Pyomolayer)
@@ -284,12 +283,10 @@ def main():
     true_mse = mse(true_copt_controls, val_mpc_controls)
     print("True MSE", true_mse)
 
-    # variables_name = ["controls", "states"]
-    variables_name = ["controls"]
-    variables_size = {'controls':[T, m], "states":[T, n]}
-    parameters_name = ["x", "weights"]
-    parameters_size = {"x": [n], "weights":[n]}
     model_mpc = model_instance_mpc()
+    variables_name = [model_mpc.controls]
+    parameters_name = [model_mpc.x, model_mpc.weights]
+    
     Pyomolayer_adp = PyomoOptLayer(model_mpc, variables_name, parameters_name, solver = 'ipopt')
     
     val_losses = []
