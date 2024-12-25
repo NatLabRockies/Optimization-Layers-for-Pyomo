@@ -107,15 +107,13 @@ def model_instance(m, n, p):
 def QP_grad_pyomo(n, p, sample_num, batch_size, alg = "pyomo", val_seed=0):
     m = 1
     if alg == "pyomo":
-        variables_name = ["x"]
-        variables_size = {'x':[n]}
-        parameters_name = ["Psqrt", "q", "A", "b", "d"]
-        parameters_size = {'Psqrt':[n, n], 'q':[n], "A" : [m, n, n], "b" : [m, n], 'd':[m]}
+        model = model_instance(m, n, p)
+        variables_name = [model.x]
+        parameters_name = [model.Psqrt, model.q, model.A, model.b, model.d]
         if partial:
-            grad_parameters_name = ["Psqrt", "q", "A", "d"]
+            grad_parameters_name = [model.Psqrt, model.q, model.A, model.d]
         else:
             grad_parameters_name = None
-        model = model_instance(m, n, p)
         Layer = PyomoOptLayer(model, variables_name, parameters_name, grad_parameters_name, solver = 'ipopt')
     elif alg == "cvxpy":
         x = cp.Variable(n)
