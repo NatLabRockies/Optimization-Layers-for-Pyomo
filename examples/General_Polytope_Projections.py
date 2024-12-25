@@ -108,12 +108,11 @@ def main():
     eporch_num = 40
     lr = 1e-1
     lr_schedule, thre_epoch = 1e-2, int(eporch_num/2)
-
-    variables_name = ["x"]
-    variables_size = {'x':[n]}
-    parameters_name = ["G", "h", "p"]
-    parameters_size = {'G':[p, n], "h" : [p], "p": [n]}
+    
     model = model_instance()
+    variables_name = [model.x]
+    parameters_name = [model.G, model.h, model.p]
+    
     Pyomolayer = PyomoOptLayer(model, variables_name, parameters_name, solver = 'ipopt')
     X = torch.randn(batch, n)
     Y = X / X.norm(dim=1).clamp(min=1)[:,None]
