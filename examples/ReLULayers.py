@@ -126,11 +126,10 @@ def main():
     sample_num = 300
     epoch = 50
     learning_rate = 1e-2
-    variables_name = ["z"]
-    variables_size = {'z':[D_out], "Wtilde":[D_out, D_in]}
-    parameters_name = ["W", "b", "x"]
-    parameters_size = {'W':[D_out, D_in], "b" : [D_out], "x": [D_in]}
+    
     model = model_instance()
+    variables_name = [model.z]
+    parameters_name = [model.W, model.b, model.x]
     Pyomolayer = PyomoOptLayer(model, variables_name, parameters_name, solver = 'ipopt')
 
     torch.manual_seed(0)
