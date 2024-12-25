@@ -87,11 +87,9 @@ def main():
     valid_sample_num = 50
     mse_loss = torch.nn.MSELoss()
 
-    variables_name = ["x"]
-    variables_size = {'x':[n]}
-    parameters_name = ["y"]
-    parameters_size = {"y" : [n]}
     model = model_instance()
+    variables_name = [model.x]
+    parameters_name = [model.y]
     Pyomolayer = PyomoOptLayer(model, variables_name, parameters_name, solver = 'ipopt')
 
     torch.manual_seed(0)
