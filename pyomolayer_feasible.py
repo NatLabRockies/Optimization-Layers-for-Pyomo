@@ -6,6 +6,7 @@ import sys
 sys.path.append('..')  # Add the parent directory to Python's search path
 import pyomo.environ as pyo
 from pyomo.contrib.pynumero.interfaces.pyomo_nlp import PyomoNLP
+from pyomo.opt import TerminationCondition
 import copy
 from utilities import get_sen
 torch.set_default_dtype(torch.float64)
