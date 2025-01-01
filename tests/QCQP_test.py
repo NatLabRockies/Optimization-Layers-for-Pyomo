@@ -11,10 +11,13 @@
 # %%
 import sys
 import os
+import datetime
 current_dir = os.getcwd()
 sys.path.append(current_dir) # Add the parent directory to Python's search path
-results_dir = os.path.join(current_dir, "tests/results")
-
+results_dir = os.path.join(current_dir, "tests", "results_" + datetime.date.today().strftime("%Y%m%d"))
+if not os.path.exists(results_dir):
+    os.makedirs(results_dir)
+    
 import pyomo.environ as pyo
 import numpy as np
 from pyomolayer import PyomoOptLayer
@@ -111,10 +114,10 @@ def QP_grad_pyomo(n, p, sample_num, batch_size, alg = "pyomo", val_seed=0):
         variables_name = [model.x]
         parameters_name = [model.Psqrt, model.q, model.A, model.b, model.d]
         if partial:
-            grad_parameters_name = [model.Psqrt, model.q, model.A, model.d]
+            free_parameters_name = [model.b]
         else:
-            grad_parameters_name = None
-        Layer = PyomoOptLayer(model, variables_name, parameters_name, grad_parameters_name, solver = 'ipopt')
+            free_parameters_name = None
+        Layer = PyomoOptLayer(model, variables_name, parameters_name, free_parameters_name, solver = 'ipopt')
     elif alg == "cvxpy":
         x = cp.Variable(n)
         Q_sqrt = cp.Parameter((n, n))
@@ -248,8 +251,9 @@ def grad_diff(n: int = 1, p: int = 1, sample_num: int = 32, batch_size: int = 32
     np.save(os.path.join(results_dir, "QCQP_dvalG.npy"), dvalG)
     np.save(os.path.join(results_dir, "QCQP_primal.npy"), primal)
     np.save(os.path.join(results_dir, "QCQP_dual.npy"), duals)
-
+    print("pyomo_time", pyomo_time)
     PsqrtG_ref, qvalG_ref, AvalG_ref, bvalG_ref, dvalG_ref, cvxpy_time, primal_ref, _ = QP_grad_pyomo(n, p, sample_num, batch_size, alg = "cvxpy", val_seed=val_seed)
+    print("cvxpy_time", cvxpy_time)
     duals_ref = get_duals(n, p, sample_num, val_seed)
     if partial:
         inputs = [(primal, primal_ref), (duals, duals_ref), (PsqrtG, PsqrtG_ref), (qvalG, qvalG_ref), (AvalG, AvalG_ref), (dvalG, dvalG_ref)]
@@ -288,5 +292,5 @@ def test_grad():
 
 if __name__ == "__main__":
     global partial
-    partial = True
+    partial = False
     test_grad()

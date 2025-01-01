@@ -11,10 +11,13 @@
 # %%
 import sys
 import os
+import datetime
 current_dir = os.getcwd()
 sys.path.append(current_dir) # Add the parent directory to Python's search path
-results_dir = os.path.join(current_dir, "tests/results")
-
+results_dir = os.path.join(current_dir, "tests", "results_" + datetime.date.today().strftime("%Y%m%d"))
+if not os.path.exists(results_dir):
+    os.makedirs(results_dir)
+    
 import pyomo.environ as pyo
 import numpy as np
 from pyomolayer import PyomoOptLayer
@@ -108,10 +111,10 @@ def QP_grad_pyomo(n, t, p, sample_num, batch_size, alg = "pyomo", val_seed=0):
         variables_name = [model.x]
         parameters_name = [model.Psqrt, model.q, model.A, model.b, model.G, model.h]
         if partial:
-            grad_parameters_name = [model.Psqrt, model.q, model.A, model.G, model.h]
+            free_parameters_name = [model.b]
         else:
-            grad_parameters_name = None
-        Layer = PyomoOptLayer(model, variables_name, parameters_name, grad_parameters_name, solver = 'ipopt')
+            free_parameters_name = None
+        Layer = PyomoOptLayer(model, variables_name, parameters_name, free_parameters_name, solver = 'ipopt')
     elif alg == "cvxpy":
         x = cp.Variable(n)
         Q_sqrt = cp.Parameter((n, n))
@@ -143,7 +146,7 @@ def QP_grad_pyomo(n, t, p, sample_num, batch_size, alg = "pyomo", val_seed=0):
         q_batch = q_batch.detach().clone().requires_grad_(True)
         A_batch = A_batch.detach().clone().requires_grad_(True)
         b_batch = b_batch.detach().clone().requires_grad_(True)
-        G_batch = G_batch.detach().clone().requires_grad_(False)
+        G_batch = G_batch.detach().clone().requires_grad_(True)
         h_batch = h_batch.detach().clone().requires_grad_(True)
         input = tuple([P_batch, q_batch, A_batch, b_batch, G_batch, h_batch])
         if alg == "pyomo":
@@ -238,8 +241,9 @@ def grad_diff(n: int = 10, t: int = 5, p: int = 2, sample_num: int = 32, batch_s
     np.save(os.path.join(results_dir, "QP_hvalG.npy"), hvalG)
     np.save(os.path.join(results_dir, "QP_primal.npy"), primal)
     np.save(os.path.join(results_dir, "QP_dual.npy"), duals)
-   #PsqrtG_ref, qvalG_ref, AvalG_ref, bvalG_ref, GvalG_ref, hvalG_ref, cvxpy_time, primal_ref = QP_grad_cvxpy(n, t, p, sample_num, batch_size, val_seed=val_seed)
+    print("pyomo_time", pyomo_time)
     PsqrtG_ref, qvalG_ref, AvalG_ref, bvalG_ref, GvalG_ref, hvalG_ref, cvxpy_time, primal_ref, _ = QP_grad_pyomo(n, t, p, sample_num, batch_size, alg = "cvxpy", val_seed=val_seed)
+    print("cvxpy_time", cvxpy_time)
     duals_ref = get_duals(n, t, p, sample_num, val_seed)
     if partial:
         inputs = [(primal, primal_ref), (duals, duals_ref), (PsqrtG, PsqrtG_ref), (qvalG, qvalG_ref), (AvalG, AvalG_ref), (bvalG, bvalG_ref), (hvalG, hvalG_ref)]
@@ -277,5 +281,5 @@ def test_grad():
 
 if __name__ == "__main__":
     global partial
-    partial = True
+    partial = False
     test_grad()
