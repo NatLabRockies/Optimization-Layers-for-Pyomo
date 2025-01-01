@@ -9,7 +9,7 @@ from pyomo.contrib.pynumero.interfaces.pyomo_nlp import PyomoNLP
 from pyomo.contrib.pynumero.interfaces.nlp_projections import ProjectedExtendedNLP
 from pyomo.contrib.pynumero.sparse import BlockMatrix, BlockVector
 from pyomo.common.timing import HierarchicalTimer
-
+Debug = False
 torch.set_default_dtype(torch.float64)
 
 class InteriorPointInterface(object):
@@ -195,7 +195,7 @@ class InteriorPointInterface(object):
     def get_pyomo_constraints(self):
         return self._nlp.get_pyomo_constraints()
 
-def get_sen(concrete_model, parameters_name, parameters_size, variables_name_index): 
+def get_sen(concrete_model, parameters_name, param_order, vars_obj): 
     """
     Descriptions: 
         Obtain the sensitivity matrix of decision variables with respect to the parameters.
@@ -205,8 +205,6 @@ def get_sen(concrete_model, parameters_name, parameters_size, variables_name_ind
             The concrete instance has been solved by IPOPT, and the optimal values of primal and dual variables have been obtained.
         - parameters_name(``List[str]``, required)
             A list of parameter name defined in Pyomo.
-        - parameters_size (``Dict[str: List[int]]``, required)
-            A dict of parameter name (key) and the size (value). 
         - variables_name_index(``List[str]``, required)
             A list of indexed variable names
     Returns:
@@ -219,87 +217,35 @@ def get_sen(concrete_model, parameters_name, parameters_size, variables_name_ind
         >>> concrete_model = pyo.ConcreteModel()
         >>> solver.solve(concrete_model, tee=False)
         >>> parameters_name = ["Psqrt", "q", "A", "b"]
-        >>> parameters_size = {'Psqrt':[n, n], 'q':[n], "A" : [m, n], "b" : [m]}
         >>> variables_name_index = ["x[0]", "x[1]", "x[3]", "y"]
-        >>> dvar_dp, lhs_Jac, rhs_Jac, variables_index_order = get_sen(concrete_model, parameters_name, parameters_size, variables_name_index)
+        >>> param_order = ["Psqrt[0, 0]",... "q[0]"..., "A[0, 0]"..., "b[0]"...]
+        >>> vars_obj = [x, y] based on nlp.get_pyomo_variables()
+        >>> dvar_dp, lhs_Jac, rhs_Jac, variables_index_order = get_sen(concrete_model, parameters_name, variables_name_index)
     """
     nlp = PyomoNLP(concrete_model)
-    variables_name_full = []
-    variables_nameindex_full = []
-    vars_obj = []
-    pyomo_variables = nlp.get_pyomo_variables()
-    for var in pyomo_variables:
-        variables_nameindex_full.append(var.name)
-        var_name = var.parent_component().name
-        if var_name not in variables_name_full:
-            variables_name_full.append(var_name)
-            v = getattr(concrete_model, var_name)
-            vars_obj.append(v)
-    
-    variables_index_order = []
-    for var in variables_name_index:
-        variables_index_order.append(variables_nameindex_full.index(var))
-
-    ineq_duals = []
     duals = []
     for constraint in nlp.get_pyomo_constraints():
         if constraint.active:
             duals.append(concrete_model.dual[constraint])
-
-    for constraint in nlp.get_pyomo_inequality_constraints():
-        if constraint.active:
-            ineq_duals.append(concrete_model.dual[constraint])
-    ineq_duals = np.array(ineq_duals, dtype = np.float64)
     duals = - np.array(duals, dtype = np.float64)
     nlp.set_duals(duals)
+    len_var = nlp.n_primals()
     IPOPT = InteriorPointInterface(nlp) 
     kkt = IPOPT.evaluate_primal_dual_kkt_matrix()
 
     # Unfix the param variables for Jac/Hessian evaluation
     for param in concrete_model.component_objects(pyo.Var):
-        if param.name in parameters_name:
-            param.unfix()
-
-    param_order = []
-    params_obj = []
-    for p_name in parameters_name:
-        p_attr = getattr(concrete_model, p_name)
-        params_obj.append(p_attr)
-        size = copy.deepcopy(parameters_size[p_name])
-        if len(size) == 3:
-            for i in range(size[0]):
-                for j in range(size[1]):
-                    for k in range(size[2]):
-                        param_order.append(str(p_attr[i, j, k]))
-        elif len(size) == 2:
-            for i in range(size[0]):
-                for j in range(size[1]):
-                    param_order.append(str(p_attr[i, j]))
-        elif len(size) == 1:
-            for i in range(size[0]):
-                param_order.append(str(p_attr[i]))
+        if param in parameters_name:
+            for index in param:
+                param[index].unfix() 
 
     nlp = PyomoNLP(concrete_model)
-
-    # Obtain the duals
-    ineq_duals = []
-    duals = []
-    for constraint in nlp.get_pyomo_constraints():
-        if constraint.active:
-            duals.append(concrete_model.dual[constraint])
-            
-    for constraint in nlp.get_pyomo_inequality_constraints():
-        if constraint.active:
-            ineq_duals.append(concrete_model.dual[constraint])
-            
-    ineq_duals = - np.array(ineq_duals)
-    duals = - np.array(duals)
     nlp.set_duals(duals)
 
     nlp_params = ProjectedExtendedNLP(nlp, param_order)
 
     # Build the right hand side vector
-    Hessian = nlp.extract_submatrix_hessian_lag(pyomo_variables_rows=vars_obj, pyomo_variables_cols=params_obj)
+    Hessian = nlp.extract_submatrix_hessian_lag(pyomo_variables_rows=vars_obj, pyomo_variables_cols=parameters_name)
     H_ineq = nlp_params.evaluate_jacobian_ineq()        
     H_eq = nlp_params.evaluate_jacobian_eq()
     
@@ -309,5 +255,8 @@ def get_sen(concrete_model, parameters_name, parameters_size, variables_name_ind
     kkt_rhs.set_block(2, 0, H_eq)
     kkt_rhs.set_block(3, 0, H_ineq)
     ds = spsolve(kkt.tocsc(), -kkt_rhs.tocsc())
-    dfullvar_dp = np.array(ds.todense())[:len(variables_nameindex_full), :]
-    return dfullvar_dp, kkt.tocsc().todense(), kkt_rhs.tocsc().todense(), variables_index_order
+    dfullvar_dp = np.array(ds.todense())[:len_var, :]
+    if Debug:
+        return dfullvar_dp, kkt.tocsc().todense(), kkt_rhs.tocsc().todense(), duals
+    else:
+        return dfullvar_dp, 0, 0, duals
