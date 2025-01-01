@@ -164,6 +164,7 @@ def PyomoLayerFn(concrete_model, variables_name, parameters_name, parameters_siz
             J = []
             lhs_J = []
             rhs_J = []
+            infeasible = []
             # solve over minibatch by just iterating
             for batch in range(batch_params[0].shape[0]):
                 params = [p[batch] for p in batch_params]
