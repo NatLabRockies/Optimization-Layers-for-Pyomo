@@ -1,10 +1,11 @@
 import numpy as np
 import torch
+import copy
 import torch.nn as nn
 import sys
 sys.path.append('..')  # Add the parent directory to Python's search path
 import pyomo.environ as pyo
-from pyomo.opt import TerminationCondition
+from pyomo.contrib.pynumero.interfaces.pyomo_nlp import PyomoNLP
 import copy
 from utilities import get_sen
 torch.set_default_dtype(torch.float64)
@@ -43,16 +44,27 @@ class PyomoOptLayer(nn.Module):
         >>> Layer = PyomoOptLayer(create_model, variables_name, parameters_name, free_parameters_name, solver = 'ipopt')
     """
 
-    def __init__(self, create_model, variables_name, parameters_name, free_parameters_name = None, solver = 'ipopt'):
+    def __init__(self, concrete_model, variables_name, parameters_name, free_parameters_name = None, solver = 'ipopt'):
         super().__init__()
         # takes a pyomo model
-        self.concrete_model = create_model
+        self.concrete_model = concrete_model
         self.solver = pyo.SolverFactory(solver)
         self.variables_name = variables_name
         self.parameters_name = parameters_name
         self.free_parameters_name = free_parameters_name
+        self.nlp_init = PyomoNLP(concrete_model)
         self.init_pyomo_varorder()
+        self.get_nlp_full()
 
+    def get_nlp_full(self):
+        model = copy.deepcopy(self.concrete_model)
+        # Unfix the param variables for Jac/Hessian evaluation
+        for param in model.component_objects(pyo.Var):
+            if param in self.grad_parameters_name:
+                for index in param:
+                    param[index].unfix() 
+        self.nlp_full = PyomoNLP(model)
+    
     def init_pyomo_varorder(self):
         if self.free_parameters_name:
             self.grad_parameters_name = [item for item in self.parameters_name if item not in self.free_parameters_name] 
@@ -82,6 +94,27 @@ class PyomoOptLayer(nn.Module):
                 for idx, var in enumerate(p.values()):
                     self.vars_to_indices[p][var] = idx
 
+        self.param_order = []
+        for p_name in self.grad_parameters_name:
+            for i in p_name.index_set():
+                self.param_order.append(str(p_name[i]))
+        
+        variables_name_full = []
+        self.variables_nameindex_full = []
+        self.vars_obj = []
+        pyomo_variables = self.nlp_init.get_pyomo_variables()
+        for var in pyomo_variables:
+            self.variables_nameindex_full.append(var.name)
+            var_name = var.parent_component().name
+            if var_name not in variables_name_full:
+                variables_name_full.append(var_name)
+                v = getattr(self.concrete_model, var_name)
+                self.vars_obj.append(v)
+
+        self.variables_index_order = []
+        for var in self.variables_name_index:
+            self.variables_index_order.append(self.variables_nameindex_full.index(var))
+
     def forward(self, *batch_params):
         """
         Descriptions:
@@ -110,15 +143,16 @@ class PyomoOptLayer(nn.Module):
             >>> print(b_batch.grad)
         """
         f = PyomoLayerFn(concrete_model = self.concrete_model, variables_name = self.variables_name,  \
-                        variables_name_index = self.variables_name_index, parameters_name = self.parameters_name, \
-                        parameters_size = self.parameters_size, vars_to_indices = self.vars_to_indices, \
-                        grad_parameters_name = self.grad_parameters_name, solver = self.solver)
+                        parameters_name = self.parameters_name, parameters_size = self.parameters_size, vars_to_indices = self.vars_to_indices, \
+                        grad_parameters_name = self.grad_parameters_name, nlp_init = self.nlp_init, nlp_full = self.nlp_full, \
+                        param_order = self.param_order, vars_obj = self.vars_obj,  \
+                        variables_index_order = self.variables_index_order, solver = self.solver)
 
         sol = f(*batch_params)
 
         return sol
         
-def PyomoLayerFn(concrete_model, variables_name, variables_name_index, parameters_name, parameters_size, vars_to_indices, grad_parameters_name, solver):
+def PyomoLayerFn(concrete_model, variables_name, parameters_name, parameters_size, vars_to_indices, grad_parameters_name, nlp_init, nlp_full, param_order, vars_obj, variables_index_order, solver):
     """
     Descriptions: 
         The forward and backward function for the PyomoOptLayer module.
@@ -141,8 +175,7 @@ def PyomoLayerFn(concrete_model, variables_name, variables_name_index, parameter
                         else:
                             for var, idx in vars_to_indices[p_name].items():
                                 var.fix(params_flat[idx])
-                        
-
+            
                     # concrete_model = model(*params_)
                     solver.solve(concrete_model, tee=False)
                     # should add a post-processing function to help project to the closest decision variables. 
@@ -150,29 +183,19 @@ def PyomoLayerFn(concrete_model, variables_name, variables_name_index, parameter
                     #concrete_model.pprint
                     #concrete_model.display()
                     # concrete_model.obj()
-
-                    duals = []    
-                    for constraint in concrete_model.component_objects(pyo.Constraint, active=True):
-                        for index in constraint:
-                            if constraint[index].active:
-                                duals.append(-concrete_model.dual[constraint[index]])
-                    duals = torch.tensor(duals).type_as(params[0]).view(-1)
-
                     vars = []
                     for var in variables_name:
-                        # var = concrete_model.component(v_name) 
-                        vars  += [var[i].value for i in var]
+                        vars += [var[i].value for i in var]
                     vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(True)
-                    
+                 
+                # A Jacobian matrix of the (decision variables) with respect to parameters
+                dfullvar_dp, lhs_Jac, rhs_Jac, duals = get_sen(concrete_model, grad_parameters_name, param_order, vars_obj)
                 if batch == 0:
                     primal_out = torch.zeros((batch_params[0].shape[0], len(vars)))
                     dual_out = torch.zeros((batch_params[0].shape[0], len(duals)))
-                 
-                # A Jacobian matrix of the (decision variables) with respect to parameters
-                dfullvar_dp, lhs_Jac, rhs_Jac, variables_nameindex = get_sen(concrete_model, grad_parameters_name, variables_name_index)
                 primal_out[batch] = vars
-                dual_out[batch] = duals
-                J.append(dfullvar_dp[variables_nameindex, :])
+                dual_out[batch] = torch.tensor(duals)
+                J.append(dfullvar_dp[variables_index_order, :])
                 lhs_J.append(lhs_Jac)
                 rhs_J.append(rhs_Jac)
             ctx.save_for_backward(torch.tensor(np.array(J), dtype=torch.float64))
