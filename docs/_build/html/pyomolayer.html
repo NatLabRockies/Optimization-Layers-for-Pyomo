@@ -1,7 +1,7 @@
 
 
 <!DOCTYPE html>
-<html class="writer-html5" lang="en">
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
@@ -13,9 +13,9 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=e031e9a9"></script>
-      <script src="_static/doctools.js?v=888ff710"></script>
-      <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+      <script src="_static/documentation_options.js?v=2709fde1"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
       <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -47,11 +47,11 @@
 <li class="toctree-l1"><a class="reference internal" href="algorithms.html">Algorithm Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Utilities Module</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Optimization Layer Module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#pyomolayer.PyomoLayerFn"><code class="docutils literal notranslate"><span class="pre">PyomoLayerFn()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#pyomolayer.PyomoOptLayer"><code class="docutils literal notranslate"><span class="pre">PyomoOptLayer</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#pyomolayer.PyomoOptLayer.forward"><code class="docutils literal notranslate"><span class="pre">PyomoOptLayer.forward()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#pyomolayer.PyomoOptLayer.init_pyomo_varorder"><code class="docutils literal notranslate"><span class="pre">PyomoOptLayer.init_pyomo_varorder()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#pyomolayer.PyomoOptLayer.training"><code class="docutils literal notranslate"><span class="pre">PyomoOptLayer.training</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Opt_Layer.pyomolayer.PyomoLayerFn"><code class="docutils literal notranslate"><span class="pre">PyomoLayerFn()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Opt_Layer.pyomolayer.PyomoOptLayer"><code class="docutils literal notranslate"><span class="pre">PyomoOptLayer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#Opt_Layer.pyomolayer.PyomoOptLayer.forward"><code class="docutils literal notranslate"><span class="pre">PyomoOptLayer.forward()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#Opt_Layer.pyomolayer.PyomoOptLayer.get_nlp_full"><code class="docutils literal notranslate"><span class="pre">PyomoOptLayer.get_nlp_full()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#Opt_Layer.pyomolayer.PyomoOptLayer.init_pyomo_varorder"><code class="docutils literal notranslate"><span class="pre">PyomoOptLayer.init_pyomo_varorder()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -83,10 +83,10 @@
            <div itemprop="articleBody">
              
   <section id="optimization-layer-module">
-<h1>Optimization Layer Module<a class="headerlink" href="#optimization-layer-module" title="Permalink to this heading"></a></h1>
-<span class="target" id="module-pyomolayer"></span><dl class="py function">
-<dt class="sig sig-object py" id="pyomolayer.PyomoLayerFn">
-<span class="sig-prename descclassname"><span class="pre">pyomolayer.</span></span><span class="sig-name descname"><span class="pre">PyomoLayerFn</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">concrete_model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variables_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variables_name_index</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters_size</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grad_parameters_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solver</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyomolayer.PyomoLayerFn" title="Permalink to this definition"></a></dt>
+<h1>Optimization Layer Module<a class="headerlink" href="#optimization-layer-module" title="Link to this heading"></a></h1>
+<dl class="py function" id="module-Opt_Layer.pyomolayer">
+<dt class="sig sig-object py" id="Opt_Layer.pyomolayer.PyomoLayerFn">
+<span class="sig-prename descclassname"><span class="pre">Opt_Layer.pyomolayer.</span></span><span class="sig-name descname"><span class="pre">PyomoLayerFn</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">concrete_model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variables_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters_size</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vars_to_indices</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grad_parameters_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nlp_init</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nlp_full</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vars_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variables_index_order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solver</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#Opt_Layer.pyomolayer.PyomoLayerFn" title="Link to this definition"></a></dt>
 <dd><dl class="simple">
 <dt>Descriptions: </dt><dd><p>The forward and backward function for the PyomoOptLayer module.</p>
 </dd>
@@ -94,8 +94,8 @@
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="pyomolayer.PyomoOptLayer">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyomolayer.</span></span><span class="sig-name descname"><span class="pre">PyomoOptLayer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">create_model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variables_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grad_parameters_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solver</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ipopt'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyomolayer.PyomoOptLayer" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="Opt_Layer.pyomolayer.PyomoOptLayer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">Opt_Layer.pyomolayer.</span></span><span class="sig-name descname"><span class="pre">PyomoOptLayer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">concrete_model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variables_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">free_parameters_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solver</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ipopt'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#Opt_Layer.pyomolayer.PyomoOptLayer" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
 <dl>
 <dt>Descriptions:</dt><dd><p>A subclass of torch.nn.Module.</p>
@@ -107,17 +107,17 @@
 </dl>
 </li>
 <li><dl class="simple">
-<dt>variables_name (<code class="docutils literal notranslate"><span class="pre">List[str]</span></code>, required)</dt><dd><p>A list of variable name defined in Pyomo.</p>
+<dt>variables_name (<code class="docutils literal notranslate"><span class="pre">List[objective]</span></code>, required)</dt><dd><p>A list of variable defined in Pyomo.</p>
 </dd>
 </dl>
 </li>
 <li><dl class="simple">
-<dt>parameters_name(<code class="docutils literal notranslate"><span class="pre">List[str]</span></code>, required)</dt><dd><p>A list of parameter name defined in Pyomo.</p>
+<dt>parameters_name(<code class="docutils literal notranslate"><span class="pre">List[objective]</span></code>, required)</dt><dd><p>A list of parameter defined in Pyomo.</p>
 </dd>
 </dl>
 </li>
 <li><dl class="simple">
-<dt>grad_parameters_name(<code class="docutils literal notranslate"><span class="pre">List[str]</span></code>, optional)</dt><dd><p>A list of parameter name defined in Pyomo, a subset of parameters_name. By setting to <code class="docutils literal notranslate"><span class="pre">None</span></code>, grad_parameters_name = parameters_name.</p>
+<dt>free_parameters_name(<code class="docutils literal notranslate"><span class="pre">List[objective]</span></code>, optional)</dt><dd><p>A list of parameters that do not require gradient, which a subset of parameters_name. By setting to <code class="docutils literal notranslate"><span class="pre">None</span></code>, grad_parameters_name = parameters_name.</p>
 </dd>
 </dl>
 </li>
@@ -128,26 +128,29 @@
 </li>
 </ul>
 </dd>
-<dt>Examples:</dt><dd><div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">create_model</span><span class="p">(</span><span class="n">b_value</span><span class="p">):</span> 
+<dt>Examples:</dt><dd><div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">create_model</span><span class="p">(</span><span class="n">A_value</span><span class="p">,</span> <span class="n">b_value</span><span class="p">):</span> 
 <span class="go">    concrete_model = pyo.ConcreteModel()</span>
+<span class="go">    concrete_model.x = pyo.Var(range(n), within=pyo.Reals)</span>
+<span class="go">    concrete_model.A = pyo.Var(range(n), within=pyo.Reals)</span>
 <span class="go">    concrete_model.b = pyo.Var(range(m), within=pyo.Reals)</span>
+<span class="go">    concrete_model.A[i].fix(A_value[i]) for i in range(n)</span>
 <span class="go">    concrete_model.b[i].fix(b_value[i]) for i in range(m)</span>
 <span class="go">    return concrete_model</span>
 </pre></div>
 </div>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">variables_name</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">parameters_name</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;b&quot;</span><span class="p">]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">grad_parameters_name</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;b&quot;</span><span class="p">]</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">variables_name</span> <span class="o">=</span> <span class="p">[</span><span class="n">concrete_model</span><span class="o">.</span><span class="n">x</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">parameters_name</span> <span class="o">=</span> <span class="p">[</span><span class="n">concrete_model</span><span class="o">.</span><span class="n">A</span><span class="p">,</span> <span class="n">concrete_model</span><span class="o">.</span><span class="n">b</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">grad_parameters_name</span> <span class="o">=</span> <span class="p">[</span><span class="n">concrete_model</span><span class="o">.</span><span class="n">b</span><span class="p">]</span>
 </pre></div>
 </div>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">Layer</span> <span class="o">=</span> <span class="n">PyomoOptLayer</span><span class="p">(</span><span class="n">create_model</span><span class="p">,</span> <span class="n">variables_name</span><span class="p">,</span> <span class="n">parameters_name</span><span class="p">,</span> <span class="n">grad_parameters_name</span><span class="p">,</span> <span class="n">solver</span> <span class="o">=</span> <span class="s1">&#39;ipopt&#39;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">Layer</span> <span class="o">=</span> <span class="n">PyomoOptLayer</span><span class="p">(</span><span class="n">create_model</span><span class="p">,</span> <span class="n">variables_name</span><span class="p">,</span> <span class="n">parameters_name</span><span class="p">,</span> <span class="n">free_parameters_name</span><span class="p">,</span> <span class="n">solver</span> <span class="o">=</span> <span class="s1">&#39;ipopt&#39;</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd>
 </dl>
 <dl class="py method">
-<dt class="sig sig-object py" id="pyomolayer.PyomoOptLayer.forward">
-<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">batch_params</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyomolayer.PyomoOptLayer.forward" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="Opt_Layer.pyomolayer.PyomoOptLayer.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">batch_params</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#Opt_Layer.pyomolayer.PyomoOptLayer.forward" title="Link to this definition"></a></dt>
 <dd><dl>
 <dt>Descriptions:</dt><dd><p>The forward function which takes in the parameter values and outputs the primal variables.</p>
 </dd>
@@ -182,13 +185,13 @@
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="pyomolayer.PyomoOptLayer.init_pyomo_varorder">
-<span class="sig-name descname"><span class="pre">init_pyomo_varorder</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyomolayer.PyomoOptLayer.init_pyomo_varorder" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="Opt_Layer.pyomolayer.PyomoOptLayer.get_nlp_full">
+<span class="sig-name descname"><span class="pre">get_nlp_full</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#Opt_Layer.pyomolayer.PyomoOptLayer.get_nlp_full" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
-<dl class="py attribute">
-<dt class="sig sig-object py" id="pyomolayer.PyomoOptLayer.training">
-<span class="sig-name descname"><span class="pre">training</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></em><a class="headerlink" href="#pyomolayer.PyomoOptLayer.training" title="Permalink to this definition"></a></dt>
+<dl class="py method">
+<dt class="sig sig-object py" id="Opt_Layer.pyomolayer.PyomoOptLayer.init_pyomo_varorder">
+<span class="sig-name descname"><span class="pre">init_pyomo_varorder</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#Opt_Layer.pyomolayer.PyomoOptLayer.init_pyomo_varorder" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 </dd></dl>

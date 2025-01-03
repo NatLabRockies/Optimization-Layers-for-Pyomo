@@ -1,7 +1,7 @@
 
 
 <!DOCTYPE html>
-<html class="writer-html5" lang="en">
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
@@ -13,9 +13,9 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=e031e9a9"></script>
-      <script src="_static/doctools.js?v=888ff710"></script>
-      <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+      <script src="_static/documentation_options.js?v=2709fde1"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
       <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -46,7 +46,7 @@
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Algorithm Module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#algorithms.fit"><code class="docutils literal notranslate"><span class="pre">fit()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Opt_Layer.algorithms.fit"><code class="docutils literal notranslate"><span class="pre">fit()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Utilities Module</a></li>
@@ -78,10 +78,10 @@
            <div itemprop="articleBody">
              
   <section id="algorithm-module">
-<h1>Algorithm Module<a class="headerlink" href="#algorithm-module" title="Permalink to this heading"></a></h1>
-<span class="target" id="module-algorithms"></span><dl class="py function">
-<dt class="sig sig-object py" id="algorithms.fit">
-<span class="sig-prename descclassname"><span class="pre">algorithms.</span></span><span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loss</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Xval</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Yval</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">opt=&lt;class</span> <span class="pre">'torch.optim.adam.Adam'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">opt_kwargs={'lr':</span> <span class="pre">0.001}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_size=128</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epochs=100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback=None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#algorithms.fit" title="Permalink to this definition"></a></dt>
+<h1>Algorithm Module<a class="headerlink" href="#algorithm-module" title="Link to this heading"></a></h1>
+<dl class="py function" id="module-Opt_Layer.algorithms">
+<dt class="sig sig-object py" id="Opt_Layer.algorithms.fit">
+<span class="sig-prename descclassname"><span class="pre">Opt_Layer.algorithms.</span></span><span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loss</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Xval</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Yval</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">opt=&lt;class</span> <span class="pre">'torch.optim.adam.Adam'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">opt_kwargs={'lr':</span> <span class="pre">0.001}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_size=128</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epochs=100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback=None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#Opt_Layer.algorithms.fit" title="Link to this definition"></a></dt>
 <dd><p>Description:
 The function aims to minimize the loss of <span class="math notranslate nohighlight">\(X\)</span> and <span class="math notranslate nohighlight">\(Y\)</span> by updating the parameters using the gradient descent algorithm.</p>
 <dl>

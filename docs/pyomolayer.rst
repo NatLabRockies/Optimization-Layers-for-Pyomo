@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 Optimization Layer Module
 ==============
-.. automodule:: pyomolayer
+.. automodule:: Opt_Layer.pyomolayer
    :members:
    :undoc-members:
    :show-inheritance:

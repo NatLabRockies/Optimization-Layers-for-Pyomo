@@ -1,6 +1,6 @@
 Algorithm Module
 ==============
-.. automodule:: algorithms
+.. automodule:: Opt_Layer.algorithms
    :members:
    :undoc-members:
    :show-inheritance:

@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 Utilities Module
 ==============
-.. automodule:: utilities
+.. automodule:: Opt_Layer.utilities
    :members:
    :undoc-members:
    :show-inheritance:
