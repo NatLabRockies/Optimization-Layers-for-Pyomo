@@ -9,7 +9,6 @@ with open(os.path.join(here, "requirements.txt")) as f:
 
 setup(
     name="OPT_layer_env",
-    prefix= "here",
     package_data={
         "": [
             "*requirements.txt",
