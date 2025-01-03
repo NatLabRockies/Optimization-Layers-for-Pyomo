@@ -44,12 +44,12 @@ results_dir = os.path.join(current_dir, "examples/results")
 
 import pyomo.environ as pyo
 import numpy as np
-from pyomolayer import PyomoOptLayer
+from Opt_Layer.pyomolayer import PyomoOptLayer
 import torch
 import time
 import torch.nn as nn
 import matplotlib.pyplot as plt
-from algorithms import fit
+from Opt_Layer.algorithms import fit
 from scipy.linalg import solve_discrete_are
 from scipy.linalg import sqrtm
 
