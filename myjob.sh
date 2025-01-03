@@ -10,6 +10,7 @@ module use /nopt/nrel/apps/cpu_stack/software/idaes_solvers/modules/test/
 module load netlib-lapack
 module load idaes_solvers
 
+python /projects/drl4dsr/kchen2/Opt_Layer/tests/regression_test.py
 # python /projects/drl4dsr/kchen2/Opt_Layer/tests/QP_test.py
 # python /projects/drl4dsr/kchen2/Opt_Layer/tests/QCQP_test.py
 # python /projects/drl4dsr/kchen2/Opt_Layer/examples/ReLULayers.py
