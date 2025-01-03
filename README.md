@@ -1,7 +1,8 @@
 # Opt_Layer
 
 ## Regression test
-# run pytest Opt_Layer/tests/regression_test.py 
+```bash
+pytest Opt_Layer/tests/regression_test.py 
 
 ## Installation 
 ```bash
