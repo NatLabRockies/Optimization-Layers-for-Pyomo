@@ -20,7 +20,7 @@ if not os.path.exists(results_dir):
     
 import pyomo.environ as pyo
 import numpy as np
-from pyomolayer import PyomoOptLayer
+from Opt_Layer.pyomolayer import PyomoOptLayer
 import torch
 import time
 import cvxpy as cp
