@@ -1,5 +1,8 @@
 # Opt_Layer
-
+# Requirements
+```bash
+PyNumero, PyMUMPS
+```
 # Regression test
 ```bash
 pytest Opt_Layer/tests/regression_test.py 
@@ -14,4 +17,5 @@ cd Opt_Layer
 # conda install ipopt on the local laptop 
 pip install -e .
 ```
+
 
