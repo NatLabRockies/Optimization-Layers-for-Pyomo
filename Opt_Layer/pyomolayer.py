@@ -52,18 +52,22 @@ class PyomoOptLayer(nn.Module):
         self.variables_name = variables_name
         self.parameters_name = parameters_name
         self.free_parameters_name = free_parameters_name
-        self.nlp_init = PyomoNLP(concrete_model)
+        self.nlp_var = PyomoNLP(concrete_model)
         self.init_pyomo_varorder()
-        self.get_nlp_full()
-
+        
     def get_nlp_full(self):
-        model = copy.deepcopy(self.concrete_model)
+        model = self.concrete_model
         # Unfix the param variables for Jac/Hessian evaluation
         for param in model.component_objects(pyo.Var):
             if param in self.grad_parameters_name:
                 for index in param:
                     param[index].unfix() 
         self.nlp_full = PyomoNLP(model)
+        # Fix the param variables
+        for param in model.component_objects(pyo.Var):
+            if param in self.grad_parameters_name:
+                for index in param:
+                    param[index].fix()
     
     def init_pyomo_varorder(self):
         if self.free_parameters_name:
@@ -81,10 +85,6 @@ class PyomoOptLayer(nn.Module):
                 index_set = var.index_set()
                 self.parameters_size[var.name] = [len(s) for s in index_set.subsets()]
 
-        self.variables_name_index = []
-        for var_index in self.variables_name:
-            self.variables_name_index += [var_index[i].name for i in var_index.keys()]
-
         self.vars_to_indices = {}
         for p in self.parameters_name:
             if not p.is_indexed():
@@ -99,21 +99,33 @@ class PyomoOptLayer(nn.Module):
             for i in p_name.index_set():
                 self.param_order.append(str(p_name[i]))
         
-        variables_name_full = []
-        self.variables_nameindex_full = []
-        self.vars_obj = []
-        pyomo_variables = self.nlp_init.get_pyomo_variables()
-        for var in pyomo_variables:
-            self.variables_nameindex_full.append(var.name)
-            var_name = var.parent_component().name
-            if var_name not in variables_name_full:
-                variables_name_full.append(var_name)
-                v = getattr(self.concrete_model, var_name)
-                self.vars_obj.append(v)
-
+        self.get_nlp_full()
+        self.pyomo_cons = self.nlp_full.get_pyomo_constraints()
+        self.pyomo_vars_full = self.nlp_full.get_pyomo_variables()
+        pyomo_variables_vars = self.nlp_var.get_pyomo_variables()
+        pyomo_variables_vars_name = {var.name for var in pyomo_variables_vars} 
+        # Obtain the variables index based on nlp_full.get_pyomo_variable, 
+        variables_name_full = set()
+        # Use nlp_var = ProjectedExtendedNLP(nlp_full, vars_order) in get_sen() function, make sure the var_order matches nlp_full.pyomo_variables()
+        self.vars_order = []
+        self.vars_obj = [] # nlp.extract_submatrix_hessian_lag(vars_obj) follows nlp_full pyomo_variables order
+        for var in self.pyomo_vars_full:
+            # actual vars
+            if var.name in pyomo_variables_vars_name:
+                self.vars_order.append(var.name)
+                var_name = var.parent_component().name
+                if var_name not in variables_name_full:
+                    variables_name_full.add(var_name)
+                    v = getattr(self.concrete_model, var_name)
+                    self.vars_obj.append(v)
+        
+        # obtain the order difference of nlp_full.get_pyomo_variable and variables_name given by the user
+        vars_name_index = []
+        for var_index in self.variables_name:
+            vars_name_index += [var_index[i].name for i in var_index.keys()]
         self.variables_index_order = []
-        for var in self.variables_name_index:
-            self.variables_index_order.append(self.variables_nameindex_full.index(var))
+        for var in vars_name_index:
+            self.variables_index_order.append(self.vars_order.index(var))
 
     def forward(self, *batch_params):
         """
@@ -144,15 +156,17 @@ class PyomoOptLayer(nn.Module):
         """
         f = PyomoLayerFn(concrete_model = self.concrete_model, variables_name = self.variables_name,  \
                         parameters_name = self.parameters_name, parameters_size = self.parameters_size, vars_to_indices = self.vars_to_indices, \
-                        grad_parameters_name = self.grad_parameters_name, nlp_init = self.nlp_init, nlp_full = self.nlp_full, \
-                        param_order = self.param_order, vars_obj = self.vars_obj,  \
-                        variables_index_order = self.variables_index_order, solver = self.solver)
+                        grad_parameters_name = self.grad_parameters_name, \
+                        param_order = self.param_order, vars_obj = self.vars_obj, vars_order = self.vars_order,  \
+                        variables_index_order = self.variables_index_order, \
+                        nlp_full = self.nlp_full, nlp_var = self.nlp_var, pyomo_cons = self.pyomo_cons, pyomo_vars_full = self.pyomo_vars_full, solver = self.solver)
 
         sol = f(*batch_params)
 
         return sol
         
-def PyomoLayerFn(concrete_model, variables_name, parameters_name, parameters_size, vars_to_indices, grad_parameters_name, nlp_init, nlp_full, param_order, vars_obj, variables_index_order, solver):
+def PyomoLayerFn(concrete_model, variables_name, parameters_name, parameters_size, vars_to_indices, grad_parameters_name, \
+                 param_order, vars_obj, vars_order, variables_index_order, nlp_full, nlp_var, pyomo_cons, pyomo_vars_full, solver):
     """
     Descriptions: 
         The forward and backward function for the PyomoOptLayer module.
@@ -189,7 +203,7 @@ def PyomoLayerFn(concrete_model, variables_name, parameters_name, parameters_siz
                     vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(True)
                  
                 # A Jacobian matrix of the (decision variables) with respect to parameters
-                dfullvar_dp, lhs_Jac, rhs_Jac, duals = get_sen(concrete_model, grad_parameters_name, param_order, vars_obj)
+                dfullvar_dp, lhs_Jac, rhs_Jac, duals = get_sen(concrete_model, grad_parameters_name, param_order, vars_obj, vars_order, nlp_full, nlp_var, pyomo_cons, pyomo_vars_full)
                 if batch == 0:
                     primal_out = torch.zeros((batch_params[0].shape[0], len(vars)))
                     dual_out = torch.zeros((batch_params[0].shape[0], len(duals)))
