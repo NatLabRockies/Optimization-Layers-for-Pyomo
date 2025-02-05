@@ -52,11 +52,12 @@ class PyomoOptLayer(nn.Module):
         self.concrete_model = concrete_model
         self.solver = pyo.SolverFactory(solver)
         self.variables = variables
-        self.parameters = parameters
+        self.parameter = parameters
         self.known_parameters = known_parameters
         self.free_parameters = free_parameters
         self.nlp_var = PyomoNLP(concrete_model)
         self.init_pyomo_varorder()
+        self.training = True
         
     def get_nlp_full(self):
         model = self.concrete_model
@@ -74,9 +75,9 @@ class PyomoOptLayer(nn.Module):
     
     def init_pyomo_varorder(self):
         if self.free_parameters:
-            self.grad_parameters = [item for item in self.parameters if item not in self.free_parameters] 
+            self.grad_parameters = [item for item in self.parameter if item not in self.free_parameters] 
         else:
-            self.grad_parameters = self.parameters
+            self.grad_parameters = self.parameter
         assert len(self.grad_parameters) > 0 
 
         self.parameters_size = {}
@@ -89,7 +90,7 @@ class PyomoOptLayer(nn.Module):
                 self.parameters_size[var.name] = [len(s) for s in index_set.subsets()]
 
         self.vars_to_indices = {}
-        for p in self.parameters:
+        for p in self.parameter:
             if not p.is_indexed():
                 self.vars_to_indices[p.name] = 0
             else:
@@ -157,15 +158,21 @@ class PyomoOptLayer(nn.Module):
             >>> primal_out.sum().backward()
             >>> print(b_batch.grad)
         """
-        f = PyomoLayerFn(concrete_model = self.concrete_model, variables = self.variables,  \
-                        parameters = self.parameters, parameters_size = self.parameters_size, vars_to_indices = self.vars_to_indices, \
-                        known_parameters = self.known_parameters, grad_parameters = self.grad_parameters, \
-                        param_order = self.param_order, vars_obj = self.vars_obj, vars_order = self.vars_order,  \
-                        variables_index_order = self.variables_index_order, \
-                        nlp_full = self.nlp_full, nlp_var = self.nlp_var, pyomo_cons = self.pyomo_cons, pyomo_vars_full = self.pyomo_vars_full, solver = self.solver)
+        if self.training:
+            f = PyomoLayerFn(concrete_model = self.concrete_model, variables = self.variables,  \
+                            parameters = self.parameter, parameters_size = self.parameters_size, vars_to_indices = self.vars_to_indices, \
+                            known_parameters = self.known_parameters, grad_parameters = self.grad_parameters, \
+                            param_order = self.param_order, vars_obj = self.vars_obj, vars_order = self.vars_order,  \
+                            variables_index_order = self.variables_index_order, nlp_full = self.nlp_full, nlp_var = self.nlp_var, \
+                            pyomo_cons = self.pyomo_cons, pyomo_vars_full = self.pyomo_vars_full, solver = self.solver)
 
-        sol = f(*batch_params)
-
+            sol = f(*batch_params)
+        else:
+            with torch.no_grad(): 
+                f = PyomoLayerFn_eval(concrete_model = self.concrete_model, variables = self.variables,  \
+                            parameters = self.parameter, vars_to_indices = self.vars_to_indices, \
+                            known_parameters = self.known_parameters, solver = self.solver)
+                sol = f(*batch_params)
         return sol
         
 def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to_indices, known_parameters, grad_parameters, \
@@ -250,3 +257,56 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             return *grad_reshape, None
 
     return PyomoLayerFnFn.apply
+
+def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver):
+    """
+    Descriptions: 
+        The forward and backward function for the PyomoOptLayer module.
+    """
+    class PyomoLayerFnFn_eval(torch.autograd.Function):
+        @staticmethod
+        def forward(ctx, *batch_params):
+            # solve over minibatch by just iterating
+            for batch in range(batch_params[0].shape[0]):
+                params = [p[batch] for p in batch_params]
+                with torch.no_grad():
+                    params_ = [p.detach().clone().double().numpy() for p in params]
+                    for index, p_name in enumerate(parameters):
+                        params_flat = params_[index].reshape(-1)
+                        if not p_name.is_indexed():
+                            p_name.fix(params_flat)
+                        else:
+                            for var, idx in vars_to_indices[p_name].items():
+                                var.fix(params_flat[idx])
+                    end_ = index + 1
+                    if known_parameters:
+                        for index, p_name in enumerate(known_parameters):
+                            params_flat = params_[end_ + index].reshape(-1)
+                            for idx, p_idx in enumerate(p_name.keys()):
+                                p_name[p_idx] = params_flat[idx] 
+                            
+                    # concrete_model = model(*params_)
+                    solver.solve(concrete_model, tee=False)
+                    # TODO mini slack -> training obj is 0 -> 
+                    # if not pyo.check_optimal_termination(results):
+                    #     raise RuntimeWarning("IPOPT failed to converge! Watch out!")
+                    # should add a post-processing function to help project to the closest decision variables. 
+                    # decision variables
+                    #concrete_model.pprint
+                    # concrete_model.display()
+                    # concrete_model.obj()
+                    vars = []
+                    for var in variables:
+                        vars += [var[i].value for i in var]
+                    vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(True)
+
+                if batch == 0:
+                    primal_out = torch.zeros((batch_params[0].shape[0], len(vars)))
+                primal_out[batch] = vars
+            return primal_out, None, None, None
+
+        @staticmethod
+        def backward(ctx, grad_out, dual_dummy = 0, Jac_dummy = 0, rhs_dummy = 0):
+            return None
+
+    return PyomoLayerFnFn_eval.apply
