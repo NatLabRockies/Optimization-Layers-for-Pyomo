@@ -41,9 +41,9 @@ for file in common_files:
         # Compare arrays
         if np.array_equal(base_array, current_array):
             print(f"{file}: Arrays are identical.")
-        elif np.allclose(base_array, current_array, rtol=1e-05, atol=1e-08, equal_nan=False):
+        elif np.allclose(base_array, current_array, rtol=1e-10, atol=1e-10, equal_nan=False):
             Pass = False
-            print(f"{file}: Arrays are close within relative tolerance 1e-5.")
+            print(f"{file}: Arrays are close within relative tolerance 1e-10.")
         else:
             # Compute difference summary
             Pass = False
