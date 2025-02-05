@@ -88,9 +88,9 @@ def main():
     mse_loss = torch.nn.MSELoss()
 
     model = model_instance()
-    variables_name = [model.x]
-    parameters_name = [model.y]
-    Pyomolayer = PyomoOptLayer(model, variables_name, parameters_name, solver = 'ipopt')
+    variables = [model.x]
+    parameters = [model.y]
+    Pyomolayer = PyomoOptLayer(model, variables, parameters, solver = 'ipopt')
 
     torch.manual_seed(0)
     theta_true = torch.randn(n1, n)
