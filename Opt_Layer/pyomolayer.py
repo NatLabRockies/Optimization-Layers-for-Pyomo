@@ -9,6 +9,8 @@ from pyomo.contrib.pynumero.interfaces.pyomo_nlp import PyomoNLP
 import copy
 from Opt_Layer.utilities import get_sen
 torch.set_default_dtype(torch.float64)
+import logging
+logging.getLogger('pyomo.core').setLevel(logging.ERROR)
 
 class PyomoOptLayer(nn.Module):
     """
@@ -44,13 +46,14 @@ class PyomoOptLayer(nn.Module):
         >>> Layer = PyomoOptLayer(create_model, variables_name, parameters_name, free_parameters_name, solver = 'ipopt')
     """
 
-    def __init__(self, concrete_model, variables_name, parameters_name, free_parameters_name = None, solver = 'ipopt'):
+    def __init__(self, concrete_model, variables_name, parameters_name, free_parameters_name = None, parameters_known = None, solver = 'ipopt'):
         super().__init__()
         # takes a pyomo model
         self.concrete_model = concrete_model
         self.solver = pyo.SolverFactory(solver)
         self.variables_name = variables_name
         self.parameters_name = parameters_name
+        self.parameters_known = parameters_known
         self.free_parameters_name = free_parameters_name
         self.nlp_var = PyomoNLP(concrete_model)
         self.init_pyomo_varorder()
@@ -156,7 +159,7 @@ class PyomoOptLayer(nn.Module):
         """
         f = PyomoLayerFn(concrete_model = self.concrete_model, variables_name = self.variables_name,  \
                         parameters_name = self.parameters_name, parameters_size = self.parameters_size, vars_to_indices = self.vars_to_indices, \
-                        grad_parameters_name = self.grad_parameters_name, \
+                        parameters_known = self.parameters_known, grad_parameters_name = self.grad_parameters_name, \
                         param_order = self.param_order, vars_obj = self.vars_obj, vars_order = self.vars_order,  \
                         variables_index_order = self.variables_index_order, \
                         nlp_full = self.nlp_full, nlp_var = self.nlp_var, pyomo_cons = self.pyomo_cons, pyomo_vars_full = self.pyomo_vars_full, solver = self.solver)
@@ -165,7 +168,7 @@ class PyomoOptLayer(nn.Module):
 
         return sol
         
-def PyomoLayerFn(concrete_model, variables_name, parameters_name, parameters_size, vars_to_indices, grad_parameters_name, \
+def PyomoLayerFn(concrete_model, variables_name, parameters_name, parameters_size, vars_to_indices, parameters_known, grad_parameters_name, \
                  param_order, vars_obj, vars_order, variables_index_order, nlp_full, nlp_var, pyomo_cons, pyomo_vars_full, solver):
     """
     Descriptions: 
@@ -189,13 +192,22 @@ def PyomoLayerFn(concrete_model, variables_name, parameters_name, parameters_siz
                         else:
                             for var, idx in vars_to_indices[p_name].items():
                                 var.fix(params_flat[idx])
-            
+                    end_ = index + 1
+                    if parameters_known:
+                        for index, p_name in enumerate(parameters_known):
+                            params_flat = params_[end_ + index].reshape(-1)
+                            for idx, p_idx in enumerate(p_name.keys()):
+                                p_name[p_idx] = params_flat[idx] 
+                            
                     # concrete_model = model(*params_)
                     solver.solve(concrete_model, tee=False)
+                    # TODO mini slack -> training obj is 0 -> 
+                    # if not pyo.check_optimal_termination(results):
+                    #     raise RuntimeWarning("IPOPT failed to converge! Watch out!")
                     # should add a post-processing function to help project to the closest decision variables. 
                     # decision variables
                     #concrete_model.pprint
-                    #concrete_model.display()
+                    # concrete_model.display()
                     # concrete_model.obj()
                     vars = []
                     for var in variables_name:
@@ -213,14 +225,13 @@ def PyomoLayerFn(concrete_model, variables_name, parameters_name, parameters_siz
                 lhs_J.append(lhs_Jac)
                 rhs_J.append(rhs_Jac)
             ctx.save_for_backward(torch.tensor(np.array(J), dtype=torch.float64))
-            return primal_out, dual_out, lhs_J, rhs_J
+            return primal_out, dual_out, lhs_J, rhs_J, np.array(J)
 
         @staticmethod
-        def backward(ctx, grad_out, dual_dummy = 0, Jac_dummy = 0, rhs_dummy = 0):
+        def backward(ctx, grad_out, dual_dummy = 0, Jac_dummy = 0, rhs_dummy = 0, Jinv_dummy = 0):
             
             batch_size = grad_out.shape[0]
             Jac, = ctx.saved_tensors
-            
             grad = (Jac.transpose(1, 2).bmm(grad_out.unsqueeze(-1))).squeeze(-1)
             grad_reshape = []
             start = 0
@@ -233,6 +244,8 @@ def PyomoLayerFn(concrete_model, variables_name, parameters_name, parameters_siz
                 size.insert(0, batch_size)
                 grad_reshape.append(grad[:, start:start+param_length].reshape(size))
                 start += param_length
+            if parameters_known:
+                grad_reshape.extend([None] * len(parameters_known))
             grad_reshape = tuple(grad_reshape)
             return *grad_reshape, None
 
