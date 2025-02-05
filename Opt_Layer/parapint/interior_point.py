@@ -383,7 +383,7 @@ def numeric_factorization(interface: BaseInteriorPointInterface,
                 kkt = kkt.copy()
             kkt = interface.regularize_equality_gradient(kkt=kkt, coef=-inertia_coef, copy_kkt=False)
             # TODO: may need to reularize hessian to overcome singularity, seems not.
-            # kkt = interface.regularize_hessian(kkt=kkt, coef=inertia_coef, copy_kkt=False)
+            #kkt = interface.regularize_hessian(kkt=kkt, coef=inertia_coef, copy_kkt=False)
             status, num_realloc = try_factorization_and_reallocation(kkt=kkt,
                                                                      linear_solver=options.linalg.solver,
                                                                      reallocation_factor=options.linalg.reallocation_factor,
