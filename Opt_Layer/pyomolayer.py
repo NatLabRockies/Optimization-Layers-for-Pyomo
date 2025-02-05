@@ -23,9 +23,11 @@ class PyomoOptLayer(nn.Module):
         - variables (``List[objective]``, required)
             A list of variable defined in Pyomo.
         - parameters(``List[objective]``, required)
-            A list of parameter defined in Pyomo.
+            A list of parameter defined in Pyomo, whose gradients are needed.
         - free_parameters(``List[objective]``, optional)
             A list of parameters that do not require gradient, which a subset of parameters. By setting to ``None``, grad_parameters = parameters.
+        - known_parameters(``List[objective]``, optional)
+            A list of actual parameters that do not require gradient.
         - solver (``str`` , optional)
             The optimization solver. The default solver is ``ipopt``.
 
@@ -35,15 +37,16 @@ class PyomoOptLayer(nn.Module):
             concrete_model.x = pyo.Var(range(n), within=pyo.Reals)
             concrete_model.A = pyo.Var(range(n), within=pyo.Reals)
             concrete_model.b = pyo.Var(range(m), within=pyo.Reals)
+            concrete_model.d = pyo.Param(range(m), within=pyo.Reals)
             concrete_model.A[i].fix(A_value[i]) for i in range(n)
             concrete_model.b[i].fix(b_value[i]) for i in range(m)
             return concrete_model
             
         >>> variables = [concrete_model.x]
         >>> parameters = [concrete_model.A, concrete_model.b]
-        >>> grad_parameters = [concrete_model.b]
-
-        >>> Layer = PyomoOptLayer(create_model, variables, parameters_name, free_parameters_name, solver = 'ipopt')
+        >>> free_parameters = [concrete_model.b]
+        >>> known_parameters = [concrete_model.d]
+        >>> Layer = PyomoOptLayer(create_model, variables, parameters, free_parameters, known_parameters, solver = 'ipopt')
     """
 
     def __init__(self, concrete_model, variables, parameters, free_parameters = None, known_parameters = None, solver = 'ipopt'):
