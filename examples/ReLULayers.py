@@ -128,9 +128,9 @@ def main():
     learning_rate = 1e-2
     
     model = model_instance()
-    variables_name = [model.z]
-    parameters_name = [model.W, model.b, model.x]
-    Pyomolayer = PyomoOptLayer(model, variables_name, parameters_name, solver = 'ipopt')
+    variables = [model.z]
+    parameters = [model.W, model.b, model.x]
+    Pyomolayer = PyomoOptLayer(model, variables, parameters, solver = 'ipopt')
 
     torch.manual_seed(0)
     net = torch.nn.Sequential(
