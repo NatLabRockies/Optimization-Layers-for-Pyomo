@@ -1,8 +1,8 @@
 import numpy as np
 import torch
 import copy
-from scipy.sparse import coo_matrix, identity
-from scipy.sparse.linalg import spsolve
+from scipy.sparse import coo_matrix, identity, diags
+from scipy.sparse.linalg import spsolve, lsqr 
 from Opt_Layer.parapint.interior_point import IPOptions, ip_solve_optimal
 from Opt_Layer.parapint.mumps_interface import MumpsInterface
 from Opt_Layer.parapint.scipy_interface import ScipyInterface
@@ -147,6 +147,13 @@ class InteriorPointInterface(object):
 
         timer.start('hess block')
         data = duals_primals_lb / (primals - self._nlp.primals_lb()) + duals_primals_ub / (self._nlp.primals_ub() - primals)
+        # if np.any(np.isnan(data)) or np.any(np.isinf(data)):
+        #     print(f"{duals_primals_lb=}")
+        #     print(f"{duals_primals_ub=}")
+        #     print(f"{primals=}")
+        #     print(f"{self._nlp.primals_ub()=}")
+        #     print(f"{self._nlp.primals_lb()=}")
+        #     print("data1", data)
         n = self._nlp.n_primals()
         indices = np.arange(n)
         hess_block.row = np.concatenate([hess_block.row, indices])
@@ -253,16 +260,20 @@ class InteriorPointInterface(object):
                 raise Exception("Unknown duals. Please define dual in Pyomo model, i.e., model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT)")
             if hasattr(pyomo_model, 'ipopt_zL_out'):
                 zL_suffix = pyomo_model.ipopt_zL_out
-                full_duals_primals_lb = np.empty(self._nlp.n_primals())
-                for i, v in enumerate(pyomo_variables):
+                full_duals_primals_lb = np.zeros(self._nlp.n_primals())
+                k = 0
+                for _, v in enumerate(pyomo_variables):
                     if v in zL_suffix:
-                        full_duals_primals_lb[i] = zL_suffix[v]
+                        full_duals_primals_lb[k] = zL_suffix[v]
+                        k += 1
             if hasattr(pyomo_model, 'ipopt_zU_out'):
                 zU_suffix = pyomo_model.ipopt_zU_out
-                full_duals_primals_ub = np.empty(self._nlp.n_primals())
-                for i, v in enumerate(pyomo_variables):
+                full_duals_primals_ub = np.zeros(self._nlp.n_primals())
+                k = 0
+                for _, v in enumerate(pyomo_variables):
                     if v in zU_suffix:
-                        full_duals_primals_ub[i] = zU_suffix[v]
+                        full_duals_primals_ub[k] = zU_suffix[v]
+                        k += 1
         if full_duals_primals_lb is None or full_duals_primals_ub is None:
             raise Exception("Unknown duals_primals_lb/ub. Please define ipopt_zL_out and ipopt_zU_out in Pyomo model, \
                             i.e., model.ipopt_zL_out = pyo.Suffix(direction=pyo.Suffix.IMPORT) \
@@ -341,22 +352,30 @@ def get_sen(concrete_model, parameters_name, param_order, vars_obj, vars_order, 
     kkt_rhs.set_block(2, 0, H_eq)
     kkt_rhs.set_block(3, 0, H_ineq)
 
+    if np.any(np.isnan(kkt.tocsc().todense())) or np.any(np.isinf(kkt.tocsc().todense())):
+        raise RuntimeError("This is a runtime error")
     global is_first_call
     global IPsolver
-    if is_first_call:
-        IPsolver = IPOptions()
-        IPsolver.use_inertia_correction = True
-        # IPsolver.linalg.solver = MumpsInterface()
-        IPsolver.linalg.solver = ScipyInterface(compute_inertia=IPsolver.use_inertia_correction)
-        ds, IPsolver = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
-                                   is_first_call = is_first_call, IPoptions = IPsolver)
-        is_first_call = False
-    else:     
-        ds, _ = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
+    try:
+        if is_first_call:
+            IPsolver = IPOptions()
+            IPsolver.use_inertia_correction = True
+            # IPsolver.linalg.solver = MumpsInterface()
+            IPsolver.linalg.solver = ScipyInterface(compute_inertia=IPsolver.use_inertia_correction)
+            ds, IPsolver = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
                                     is_first_call = is_first_call, IPoptions = IPsolver)
+            is_first_call = False
+        else:     
+            ds, _ = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
+                                        is_first_call = is_first_call, IPoptions = IPsolver)
+    except:
+        rhs = -kkt_rhs.toarray()
+        ds = np.zeros_like(rhs)
+        
     dfullvar_dp = ds[:len(vars_order), :]
     # ds = spsolve(kkt.tocsc(), -kkt_rhs.tocsc())
     # dfullvar_dp = np.array(ds.todense())[:len(vars_order), :]
+
     if Debug:
         return dfullvar_dp, kkt.tocsc().todense(), kkt_rhs.tocsc().todense(), duals
     else:
