@@ -210,10 +210,10 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
                                 p_name[p_idx] = params_flat[idx] 
                             
                     # concrete_model = model(*params_)
-                    solver.solve(concrete_model, tee=False)
+                    result = solver.solve(concrete_model, tee=False)
                     # TODO mini slack -> training obj is 0 -> 
-                    # if not pyo.check_optimal_termination(results):
-                    #     raise RuntimeWarning("IPOPT failed to converge! Watch out!")
+                    if not pyo.check_optimal_termination(result):
+                        raise RuntimeError("IPOPT failed to converge!")
                     # should add a post-processing function to help project to the closest decision variables. 
                     # decision variables
                     #concrete_model.pprint
