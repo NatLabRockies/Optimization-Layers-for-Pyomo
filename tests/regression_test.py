@@ -11,8 +11,8 @@ sys.path.append(current_dir) # Add the parent directory to Python's search path
 base_results = os.path.join(current_dir, "tests/results_12172024")
 current_results = os.path.join(current_dir, "tests/results_" + datetime.date.today().strftime("%Y%m%d"))
 
-subprocess.run(["python", os.path.join(current_dir, "tests/QP_test.py")])
-subprocess.run(["python", os.path.join(current_dir, "tests/QCQP_test.py")])
+subprocess.run(["python", os.path.join(current_dir, "tests/QP_test.py"), "1"], check=True)
+subprocess.run(["python", os.path.join(current_dir, "tests/QCQP_test.py"), "1"], check=True)
 
 # List files in both folders
 base_result_files = set(os.listdir(base_results))

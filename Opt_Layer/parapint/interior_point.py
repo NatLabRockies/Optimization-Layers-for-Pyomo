@@ -1,19 +1,18 @@
 import sys
-sys.path.append("/Users/kchen2/Opt_Layer/Opt_Layer/parapint")
 from pyomo.contrib.pynumero.interfaces.utils import build_bounds_mask, build_compression_matrix
 import numpy as np
 import logging
 import time
-from results import LinearSolverStatus
 from pyomo.common.timing import HierarchicalTimer
 import enum
-from interface import BaseInteriorPointInterface
-from base_linear_solver_interface import LinearSolverInterface
 from typing import Optional
 from pyomo.common.config import ConfigDict, ConfigValue, PositiveFloat, NonNegativeInt, NonNegativeFloat
 from pyomo.contrib.pynumero.sparse import BlockMatrix, BlockVector
-from mumps_interface import MumpsInterface
-from scipy_interface import ScipyInterface
+from .mumps_interface import MumpsInterface
+from .scipy_interface import ScipyInterface
+from .interface import BaseInteriorPointInterface
+from .base_linear_solver_interface import LinearSolverInterface
+from .results import LinearSolverStatus
 """
 Interface Requirements
 ----------------------
