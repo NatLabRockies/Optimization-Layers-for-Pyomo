@@ -17,7 +17,8 @@ Debug = False
 is_first_call = True
 torch.set_default_dtype(torch.float64)
 
-class InteriorPointInterface(BaseInteriorPointInterface):
+#class InteriorPointInterface(BaseInteriorPointInterface):
+class InteriorPointInterface:
     """
     Descriptions:
         A modified class based on ``pyomo.contrib.interior_point.interface`` to obtain the left hand side matrix for KKT optimality condition.
@@ -100,7 +101,7 @@ class InteriorPointInterface(BaseInteriorPointInterface):
         return ubs_mod
 
     def ineq_lb(self):
-        lbs = self._nlp.ineq_lb()
+        lbs = self._nlp_full.ineq_lb()
         if self.bounds_relaxation_factor == 0:
             return lbs
         eye = np.ones(lbs.size)
@@ -108,7 +109,7 @@ class InteriorPointInterface(BaseInteriorPointInterface):
         return lbs_mod
 
     def ineq_ub(self):
-        ubs = self._nlp.ineq_ub()
+        ubs = self._nlp_full.ineq_ub()
         if self.bounds_relaxation_factor == 0:
             return ubs
         eye = np.ones(ubs.size)
@@ -136,8 +137,8 @@ class InteriorPointInterface(BaseInteriorPointInterface):
         hess_block = self._nlp.evaluate_hessian_lag()
         timer.stop('eval hess')
         timer.start('eval jac')
-        jac_eq = self._nlp.evaluate_jacobian_eq()
-        jac_ineq = self._nlp.evaluate_jacobian_ineq()
+        jac_eq = self.evaluate_jacobian_eq()
+        jac_ineq = self.evaluate_jacobian_ineq()
         timer.stop('eval jac')
 
         duals_primals_lb = self._duals_primals_lb
@@ -147,14 +148,15 @@ class InteriorPointInterface(BaseInteriorPointInterface):
         primals = self._nlp.get_primals()
 
         timer.start('hess block')
-        data = duals_primals_lb / (primals - self._nlp.primals_lb()) + duals_primals_ub / (self._nlp.primals_ub() - primals)
-        # if np.any(np.isnan(data)) or np.any(np.isinf(data)):
-        #     print(f"{duals_primals_lb=}")
-        #     print(f"{duals_primals_ub=}")
-        #     print(f"{primals=}")
-        #     print(f"{self._nlp.primals_ub()=}")
-        #     print(f"{self._nlp.primals_lb()=}")
-        #     print("data1", data)
+        data = duals_primals_lb / (primals - self.primals_lb()) + duals_primals_ub / (self.primals_ub() - primals)
+        if np.any(np.isnan(data)) or np.any(np.isinf(data)):
+            print(f"{duals_primals_lb=}")
+            print(f"{duals_primals_ub=}")
+            print(f"{primals=}")
+            print(f"{self.primals_ub()=}")
+            print(f"{self.primals_lb()=}")
+            print("primals block", data)
+            raise RuntimeError
         n = self._nlp.n_primals()
         indices = np.arange(n)
         hess_block.row = np.concatenate([hess_block.row, indices])
@@ -164,17 +166,25 @@ class InteriorPointInterface(BaseInteriorPointInterface):
 
         timer.start('slack block')
         data = duals_slacks_lb / (
-            self._slacks - self._nlp_full.ineq_lb()
-        ) + duals_slacks_ub / (self._nlp_full.ineq_ub() - self._slacks)
-        n = self._nlp.n_ineq_constraints()
+            self._slacks - self.ineq_lb()
+        ) + duals_slacks_ub / (self.ineq_ub() - self._slacks)
+        if np.any(np.isnan(data)) or np.any(np.isinf(data)):
+            print(f"{duals_slacks_lb=}")
+            print(f"{duals_slacks_ub=}")
+            print(f"{self._slacks=}")
+            print(f"{self.ineq_ub()=}")
+            print(f"{self.ineq_lb()=}")
+            print("slack block", data)
+            raise RuntimeError
+        n = self.n_ineq_constraints()
         indices = np.arange(n)
         slack_block = coo_matrix((data, (indices, indices)), shape=(n, n))
         timer.stop('slack block')
         
         timer.start('regularization block')
-        eq_reg_blk = identity(self._nlp.n_eq_constraints(), format='coo')
+        eq_reg_blk = identity(self.n_eq_constraints(), format='coo')
         eq_reg_blk.data.fill(0)
-        ineq_reg_blk = identity(self._nlp.n_ineq_constraints(), format='coo')
+        ineq_reg_blk = identity(self.n_ineq_constraints(), format='coo')
         ineq_reg_blk.data.fill(0)
         timer.stop('regularization block')
 
@@ -186,8 +196,8 @@ class InteriorPointInterface(BaseInteriorPointInterface):
         kkt.set_block(0, 2, jac_eq.transpose())
         kkt.set_block(3, 0, jac_ineq)
         kkt.set_block(0, 3, jac_ineq.transpose())
-        kkt.set_block(3, 1, -identity(self._nlp.n_ineq_constraints(), format='coo'))
-        kkt.set_block(1, 3, -identity(self._nlp.n_ineq_constraints(), format='coo'))
+        kkt.set_block(3, 1, -identity(self.n_ineq_constraints(), format='coo'))
+        kkt.set_block(1, 3, -identity(self.n_ineq_constraints(), format='coo'))
         kkt.set_block(2, 2, eq_reg_blk)
         kkt.set_block(3, 3, ineq_reg_blk)
         timer.stop('set block')
@@ -210,10 +220,10 @@ class InteriorPointInterface(BaseInteriorPointInterface):
             kkt = kkt.copy()
         reg_coef = coef
         eq_ptb = (reg_coef *
-                  identity(self._nlp.n_eq_constraints(),
+                  identity(self.n_eq_constraints(),
                                         format='coo'))
         ineq_ptb = (reg_coef *
-                    identity(self._nlp.n_ineq_constraints(),
+                    identity(self.n_ineq_constraints(),
                                           format='coo'))
 
         kkt.set_block(2, 2, eq_ptb)

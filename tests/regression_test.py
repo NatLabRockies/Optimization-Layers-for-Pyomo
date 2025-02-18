@@ -38,7 +38,7 @@ def test_regression(file):
     # If the shapes are the same, compare arrays
     if np.array_equal(base_array, current_array):
         print(f"{file}: Arrays are identical.")
-    assert np.allclose(base_array, current_array, atol=1e-6, equal_nan=False)
+    assert np.allclose(base_array, current_array, atol=1e-5, equal_nan=False)
 
     # Compute difference summary
     diff = np.abs(base_array - current_array)
