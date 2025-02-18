@@ -61,10 +61,10 @@ def create_model(nominal_q, nominal_P21, nominal_Psqrt, nominal_x):
     model.ipopt_zL_out = pyo.Suffix(direction=pyo.Suffix.IMPORT)
     model.ipopt_zU_out = pyo.Suffix(direction=pyo.Suffix.IMPORT)
     # Define variables
+    model.P21 = pyo.Var(range(n), range(m), within=pyo.Reals)
     model.u = pyo.Var(range(m), range(1), within=pyo.Reals)
     # Define parameters
     model.q = pyo.Var(range(m), range(1), within=pyo.Reals)
-    model.P21 = pyo.Var(range(n), range(m), within=pyo.Reals)
     model.Psqrt = pyo.Var(range(m), range(m), within=pyo.Reals)
     model.x = pyo.Var(range(n), range(1), within=pyo.Reals)
     # Define variables
