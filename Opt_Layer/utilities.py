@@ -301,7 +301,7 @@ class InteriorPointInterface:
     def get_pyomo_constraints(self):
         return self._nlp.get_pyomo_constraints()
 
-def get_sen(concrete_model, parameters_name, param_order, vars_obj, vars_order, nlp_full, nlp_var, pyomo_cons, pyomo_vars_full): 
+def get_sen(concrete_model, parameters_name, param_order, vars_obj, vars_order, nlp_full, nlp_var, pyomo_cons, pyomo_vars_full, bounds_relaxation_factor):
     """
     Descriptions: 
         Obtain the sensitivity matrix of decision variables with respect to the parameters.
@@ -348,6 +348,7 @@ def get_sen(concrete_model, parameters_name, param_order, vars_obj, vars_order, 
     nlp_vars = ProjectedExtendedNLP(nlp_full, vars_order)
 
     IPOPT = InteriorPointInterface(concrete_model, nlp_vars, nlp_full, pyomo_vars_full) 
+    IPOPT.set_bounds_relaxation_factor(bounds_relaxation_factor)
     kkt = IPOPT.evaluate_primal_dual_kkt_matrix()
 
     nlp_params = ProjectedExtendedNLP(nlp_full, param_order)

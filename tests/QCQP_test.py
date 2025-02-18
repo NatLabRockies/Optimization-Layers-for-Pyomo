@@ -119,7 +119,7 @@ def QP_grad_pyomo(n, p, sample_num, batch_size, alg = "pyomo", val_seed=0):
             free_parameters_name = [model.b]
         else:
             free_parameters_name = None
-        Layer = PyomoOptLayer(model, variables_name, parameters_name, free_parameters_name, solver = 'ipopt')
+        Layer = PyomoOptLayer(model, variables_name, parameters_name, free_parameters_name)
     elif alg == "cvxpy":
         x = cp.Variable(n)
         Q_sqrt = cp.Parameter((n, n))

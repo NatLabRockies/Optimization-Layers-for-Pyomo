@@ -28,8 +28,8 @@ class PyomoOptLayer(nn.Module):
             A list of parameters that do not require gradient, which a subset of parameters. By setting to ``None``, grad_parameters = parameters.
         - known_parameters(``List[objective]``, optional)
             A list of actual parameters that do not require gradient.
-        - solver (``str`` , optional)
-            The optimization solver. The default solver is ``ipopt``.
+        - ipopt_options (``dict`` , optional)
+            Options for Ipopt. Default is None.
 
     Examples:
         >>> def create_model(A_value, b_value): 
@@ -49,11 +49,21 @@ class PyomoOptLayer(nn.Module):
         >>> Layer = PyomoOptLayer(create_model, variables, parameters, free_parameters, known_parameters, solver = 'ipopt')
     """
 
-    def __init__(self, concrete_model, variables, parameters, free_parameters = None, known_parameters = None, solver = 'ipopt'):
+    def __init__(self, concrete_model, variables, parameters, free_parameters = None, known_parameters = None, ipopt_options = None):
         super().__init__()
         # takes a pyomo model
         self.concrete_model = concrete_model
-        self.solver = pyo.SolverFactory(solver)
+        self.solver = pyo.SolverFactory("ipopt")
+        if ipopt_options is not None:
+            for k, v in ipopt_options.items():
+                self.solver.options[k] = v
+        if "honor_original_bounds" not in self.solver.options:
+            self.solver.options["honor_original_bounds"] = "no"
+        elif self.solver.options["honor_original_bounds"].lower() == "yes":
+            raise RuntimeWarning("Ipopt configured with `honor_original_bounds == 'yes'` "
+                                 "This can often lead to errors in KKT evaluations.")
+        if "bound_relax_factor" not in self.solver.options:
+            self.solver.options["bound_relax_factor"] = 1e-08
         self.variables = variables
         self.parameter = parameters
         self.known_parameters = known_parameters
@@ -225,7 +235,7 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
                     vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(True)
                  
                 # A Jacobian matrix of the (decision variables) with respect to parameters
-                dfullvar_dp, lhs_Jac, rhs_Jac, duals = get_sen(concrete_model, grad_parameters, param_order, vars_obj, vars_order, nlp_full, nlp_var, pyomo_cons, pyomo_vars_full)
+                dfullvar_dp, lhs_Jac, rhs_Jac, duals = get_sen(concrete_model, grad_parameters, param_order, vars_obj, vars_order, nlp_full, nlp_var, pyomo_cons, pyomo_vars_full, solver.options["bound_relax_factor"])
                 if batch == 0:
                     primal_out = torch.zeros((batch_params[0].shape[0], len(vars)))
                     dual_out = torch.zeros((batch_params[0].shape[0], len(duals)))
