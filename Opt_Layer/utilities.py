@@ -4,6 +4,7 @@ import copy
 from scipy.sparse import coo_matrix, identity, diags
 from scipy.sparse.linalg import spsolve, lsqr 
 from Opt_Layer.parapint.interior_point import IPOptions, ip_solve_optimal
+from Opt_Layer.parapint.interface import BaseInteriorPointInterface
 from Opt_Layer.parapint.mumps_interface import MumpsInterface
 from Opt_Layer.parapint.scipy_interface import ScipyInterface
 
@@ -16,7 +17,7 @@ Debug = False
 is_first_call = True
 torch.set_default_dtype(torch.float64)
 
-class InteriorPointInterface(object):
+class InteriorPointInterface(BaseInteriorPointInterface):
     """
     Descriptions:
         A modified class based on ``pyomo.contrib.interior_point.interface`` to obtain the left hand side matrix for KKT optimality condition.
