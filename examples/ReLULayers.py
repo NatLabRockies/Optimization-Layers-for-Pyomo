@@ -36,7 +36,7 @@ from Opt_Layer.pyomolayer import PyomoOptLayer
 import torch
 import time
 import torch.nn as nn
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from Opt_Layer.algorithms import fit
 
 # %%

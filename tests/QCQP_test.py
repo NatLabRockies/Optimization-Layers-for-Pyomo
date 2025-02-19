@@ -272,7 +272,6 @@ def grad_diff(n: int = 1, p: int = 1, sample_num: int = 32, batch_size: int = 32
     else:
         inputs = [(primal, primal_ref), (duals, duals_ref), (PsqrtG, PsqrtG_ref), (qvalG, qvalG_ref), (AvalG, AvalG_ref), (bvalG, bvalG_ref), (dvalG, dvalG_ref)]
     diffs = [calculate_error(P, C) for P, C in inputs]
-
     if partial:
         Primal_diff, dual_diff, PsqrtG_diff, qvalG_diff, AvalG_diff, dvalG_diff =  diffs
         return Primal_diff, dual_diff, PsqrtG_diff, qvalG_diff, AvalG_diff, dvalG_diff

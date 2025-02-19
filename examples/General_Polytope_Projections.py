@@ -21,10 +21,10 @@ from Opt_Layer.pyomolayer import PyomoOptLayer
 import torch
 import time
 import torch.nn as nn
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 from scipy.spatial import HalfspaceIntersection
-from matplotlib.patches import Polygon
+# from matplotlib.patches import Polygon
 import torch.optim as optim
 # %%
 def create_model(nominal_G, nominal_h, nominal_p):
@@ -99,7 +99,7 @@ def plot_polytope(G, h, color, label):
     hs = HalfspaceIntersection(np.hstack((G.detach(),  -h[:,None].detach())), np.array([0.,0.]))
     pts = hs.intersections - hs.interior_point
     pts = pts[np.argsort(np.arctan2(pts[:,1],pts[:,0])),:] + hs.interior_point
-    plt.fill(pts[:,0], pts[:,1], color=color, alpha=0.5, label = label)
+    # plt.fill(pts[:,0], pts[:,1], color=color, alpha=0.5, label = label)
 
 def main():
     global n, p, Pyomolayer
@@ -116,8 +116,8 @@ def main():
     Pyomolayer = PyomoOptLayer(model, variables_name, parameters_name, solver = 'ipopt')
     X = torch.randn(batch, n)
     Y = X / X.norm(dim=1).clamp(min=1)[:,None]
-    plt.figure(dpi=150)
-    plt.plot(Y[:,0], Y[:,1], 'bx', label = "Initial ramdom data")
+    # plt.figure(dpi=150)
+    # plt.plot(Y[:,0], Y[:,1], 'bx', label = "Initial ramdom data")
 
     torch.manual_seed(0)
     layer = PolytopeProjection(n, p)
