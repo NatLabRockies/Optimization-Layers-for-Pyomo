@@ -40,7 +40,7 @@ import sys
 import os
 current_dir = os.getcwd()
 sys.path.append(current_dir) # Add the parent directory to Python's search path
-results_dir = os.path.join(current_dir, "examples/results")
+results_dir = os.path.join(current_dir, "examples/results_12172024")
 
 import pyomo.environ as pyo
 import numpy as np
@@ -48,7 +48,7 @@ from Opt_Layer.pyomolayer import PyomoOptLayer
 import torch
 import time
 import torch.nn as nn
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 from Opt_Layer.algorithms import fit
 from scipy.linalg import solve_discrete_are
 from scipy.linalg import sqrtm
@@ -157,7 +157,7 @@ def main():
     model = model_instance()
     variables_name = [model.u]
     parameters_name = [model.q, model.P21, model.Psqrt, model.x]
-    Pyomolayer = PyomoOptLayer(model, variables_name, parameters_name, solver = 'ipopt')
+    Pyomolayer = PyomoOptLayer(model, variables_name, parameters_name)
 
     results = []
     optimizer = torch.optim.SGD(variables, lr=.02, momentum=.9)

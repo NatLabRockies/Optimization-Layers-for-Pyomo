@@ -90,7 +90,7 @@ def main():
     model = model_instance()
     variables = [model.x]
     parameters = [model.y]
-    Pyomolayer = PyomoOptLayer(model, variables, parameters, solver = 'ipopt')
+    Pyomolayer = PyomoOptLayer(model, variables, parameters)
 
     torch.manual_seed(0)
     theta_true = torch.randn(n1, n)

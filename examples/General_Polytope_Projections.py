@@ -21,10 +21,10 @@ from Opt_Layer.pyomolayer import PyomoOptLayer
 import torch
 import time
 import torch.nn as nn
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 from scipy.spatial import HalfspaceIntersection
-# from matplotlib.patches import Polygon
+from matplotlib.patches import Polygon
 import torch.optim as optim
 # %%
 def create_model(nominal_G, nominal_h, nominal_p):
@@ -113,7 +113,7 @@ def main():
     variables_name = [model.x]
     parameters_name = [model.G, model.h, model.p]
     
-    Pyomolayer = PyomoOptLayer(model, variables_name, parameters_name, solver = 'ipopt')
+    Pyomolayer = PyomoOptLayer(model, variables_name, parameters_name)
     X = torch.randn(batch, n)
     Y = X / X.norm(dim=1).clamp(min=1)[:,None]
     # plt.figure(dpi=150)

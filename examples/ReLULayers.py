@@ -130,7 +130,7 @@ def main():
     model = model_instance()
     variables = [model.z]
     parameters = [model.W, model.b, model.x]
-    Pyomolayer = PyomoOptLayer(model, variables, parameters, solver = 'ipopt')
+    Pyomolayer = PyomoOptLayer(model, variables, parameters)
 
     torch.manual_seed(0)
     net = torch.nn.Sequential(
