@@ -8,7 +8,7 @@ with open(os.path.join(here, "requirements.txt")) as f:
     install_requires = f.readlines()
 
 setup(
-    name="OPT_layer_env",
+    name="OPT_layer",
     package_data={
         "": [
             "*requirements.txt",

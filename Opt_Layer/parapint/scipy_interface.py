@@ -1,8 +1,5 @@
 import sys
-sys.path.append("/Users/kchen2/Opt_Layer/Opt_Layer/parapint")
 
-from base_linear_solver_interface import LinearSolverInterface
-from results import LinearSolverStatus, LinearSolverResults
 from scipy.sparse.linalg import splu
 from scipy.linalg import eigvals
 from scipy.sparse import isspmatrix_csc
@@ -10,6 +7,9 @@ from pyomo.contrib.pynumero.sparse.block_vector import BlockVector
 import logging
 import numpy as np
 from scipy.sparse.linalg import spsolve
+
+from .base_linear_solver_interface import LinearSolverInterface
+from .results import LinearSolverStatus, LinearSolverResults
 
 class ScipyInterface(LinearSolverInterface):
     def __init__(self, compute_inertia=False):

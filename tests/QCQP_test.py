@@ -19,12 +19,14 @@ if not os.path.exists(results_dir):
     os.makedirs(results_dir)
     
 import pyomo.environ as pyo
+from pyomo.common.dependencies import attempt_import
 import numpy as np
 from Opt_Layer.pyomolayer import PyomoOptLayer
 import torch
 import time
-import cvxpy as cp
-from cvxpylayers.torch import CvxpyLayer
+cp, cp_available = attempt_import(name="cvxpy")
+if cp_available:
+    from cvxpylayers.torch import CvxpyLayer
 # %%
 def create_model(nominal_Psqrt, nominal_q, nominal_A, nominal_b, nominal_d):
     # Create the model
@@ -117,7 +119,7 @@ def QP_grad_pyomo(n, p, sample_num, batch_size, alg = "pyomo", val_seed=0):
             free_parameters_name = [model.b]
         else:
             free_parameters_name = None
-        Layer = PyomoOptLayer(model, variables_name, parameters_name, free_parameters_name, solver = 'ipopt')
+        Layer = PyomoOptLayer(model, variables_name, parameters_name, free_parameters_name)
     elif alg == "cvxpy":
         x = cp.Variable(n)
         Q_sqrt = cp.Parameter((n, n))
@@ -242,6 +244,16 @@ def calculate_error(actual, predicted):
         raise ValueError(f"actual dimension exceeds 3")
     return tol_diff
 
+def write_results(n: int = 1, p: int = 1, sample_num: int = 32, batch_size: int = 32, alg: str = "pyomo", val_seed: int = 0):
+    PsqrtG, qvalG, AvalG, bvalG, dvalG, pyomo_time, primal, duals = QP_grad_pyomo(n, p, sample_num, batch_size, alg = "pyomo", val_seed=val_seed)
+    np.save(os.path.join(results_dir, "QCQP_PsqrtG.npy"), PsqrtG)
+    np.save(os.path.join(results_dir, "QCQP_qvalG.npy"), qvalG)
+    np.save(os.path.join(results_dir, "QCQP_AvalG.npy"), AvalG)
+    np.save(os.path.join(results_dir, "QCQP_bvalG.npy"), bvalG)
+    np.save(os.path.join(results_dir, "QCQP_dvalG.npy"), dvalG)
+    np.save(os.path.join(results_dir, "QCQP_primal.npy"), primal)
+    np.save(os.path.join(results_dir, "QCQP_dual.npy"), duals)
+
 def grad_diff(n: int = 1, p: int = 1, sample_num: int = 32, batch_size: int = 32, alg: str = "pyomo", val_seed: int = 0):
     PsqrtG, qvalG, AvalG, bvalG, dvalG, pyomo_time, primal, duals = QP_grad_pyomo(n, p, sample_num, batch_size, alg = "pyomo", val_seed=val_seed)
     np.save(os.path.join(results_dir, "QCQP_PsqrtG.npy"), PsqrtG)
@@ -294,4 +306,7 @@ def test_grad():
 if __name__ == "__main__":
     global partial
     partial = False
-    test_grad()
+    if len(sys.argv) > 1 and sys.argv[1]:
+        write_results(n=5, p=1, sample_num=20, batch_size=20, alg="pyomo", val_seed=0)
+    else:
+        test_grad()
