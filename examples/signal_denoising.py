@@ -172,10 +172,10 @@ def main():
     Y_val = outputs[N_train:]
 
     model = model_instance()
-    variables_name = [model.y_cp]
-    parameters_name = [model.theta_param, model.x_param, model.lambda_param]
+    variables = [model.y_cp]
+    parameters = [model.theta_param, model.x_param, model.lambda_param]
     
-    Pyomolayer = PyomoOptLayer(model, variables_name, parameters_name, solver = 'ipopt')
+    Pyomolayer = PyomoOptLayer(model, variables, parameters)
 
     params = [theta_tch, lambda_tch]
     val_losses, train_losses = fit(loss_fn, params, X_train, Y_train, X_val, Y_val, \
@@ -189,9 +189,9 @@ def main():
         val_preds = Pyomolayer(theta_tch.repeat(X_val.shape[0], 1, 1), X_val, lambda_tch.repeat(X_val.shape[0], 1))
 
     model_withouttheta = model_instance_withouttheta()
-    variables_name = [model_withouttheta.y_cp]
-    parameters_name = [model_withouttheta.x_param, model_withouttheta.lambda_param]    
-    Pyomolayer_withouttheta = PyomoOptLayer(model_withouttheta, variables_name, parameters_name, solver = 'ipopt')
+    variables = [model_withouttheta.y_cp]
+    parameters = [model_withouttheta.x_param, model_withouttheta.lambda_param]    
+    Pyomolayer_withouttheta = PyomoOptLayer(model_withouttheta, variables, parameters)
 
     lambda_values = torch.linspace(1e-5, 20, 10)
     best_lambda = None
