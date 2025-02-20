@@ -301,94 +301,128 @@ class InteriorPointInterface:
     def get_pyomo_constraints(self):
         return self._nlp.get_pyomo_constraints()
 
-def get_sen(concrete_model, parameters_name, param_order, vars_obj, vars_order, nlp_full, nlp_var, pyomo_cons, pyomo_vars_full, bounds_relaxation_factor):
-    """
-    Descriptions: 
-        Obtain the sensitivity matrix of decision variables with respect to the parameters.
-    
-    Args:
-        - concrete_model (``Pyomo model``, required)
-            The concrete instance has been solved by IPOPT, and the optimal values of primal and dual variables have been obtained.
-        - parameters_name(``List[str]``, required)
-            A list of parameter name defined in Pyomo.
-        - variables_name_index(``List[str]``, required)
-            A list of indexed variable names
-    Returns:
-        The sensitivity matrix, left hand side of KKT matrix, right hand side of vector, and the order of variables
-    
-    Return type:
-        Matrix.
-    
-    Examples:
-        >>> concrete_model = pyo.ConcreteModel()
-        >>> solver.solve(concrete_model, tee=False)
-        >>> parameters_name = ["Psqrt", "q", "A", "b"]
-        >>> variables_name_index = ["x[0]", "x[1]", "x[3]", "y"]
-        >>> param_order = ["Psqrt[0, 0]",... "q[0]"..., "A[0, 0]"..., "b[0]"...]
-        >>> vars_obj = [x, y] based on nlp.get_pyomo_variables()
-        >>> dvar_dp, lhs_Jac, rhs_Jac, variables_index_order = get_sen(concrete_model, parameters_name, variables_name_index)
-    """
-    # Unfix the param variables for Jac/Hessian evaluation
-    for param in concrete_model.component_objects(pyo.Var):
-        if param in parameters_name:
-            for index in param:
-                param[index].unfix() 
 
-    primals = []
-    for var in pyomo_vars_full:
-        primals.append(var.value)
-    nlp_full.set_primals(np.array(primals))
+class Sensitivity:
+    def __init__(self, concrete_model, grad_parameters, nlp_full, nlp_var, bounds_relaxation_factor):
+        self.concrete_model = concrete_model
+        self.grad_parameters = grad_parameters
+        self.nlp_full = nlp_full
+        self.nlp_var = nlp_var
 
-    duals = []
-    for constraint in pyomo_cons:
-        duals.append(concrete_model.dual[constraint])
-    duals = - np.array(duals, dtype = np.float64)
-    nlp_full.set_duals(duals)
+        self.param_order = []
+        for p_name in self.grad_parameters:
+            for i in p_name.index_set():
+                self.param_order.append(str(p_name[i]))
 
-    nlp_vars = ProjectedExtendedNLP(nlp_full, vars_order)
+        self.pyomo_cons = self.nlp_full.get_pyomo_constraints()
+        self.pyomo_vars_full = self.nlp_full.get_pyomo_variables()
+        pyomo_variables_vars = self.nlp_var.get_pyomo_variables()
+        pyomo_variables_vars_name = {var.name for var in pyomo_variables_vars} 
+        # Obtain the variables index based on nlp_full.get_pyomo_variable, 
+        variables_name_full = set()
+        # Use nlp_var = ProjectedExtendedNLP(nlp_full, vars_order) in get_sen() function, make sure the var_order matches nlp_full.pyomo_variables()
+        self.vars_order = []
+        self.vars_obj = [] # nlp.extract_submatrix_hessian_lag(vars_obj) follows nlp_full pyomo_variables order
+        for var in self.pyomo_vars_full:
+            # actual vars
+            if var.name in pyomo_variables_vars_name:
+                self.vars_order.append(var.name)
+                var_name = var.parent_component().name
+                if var_name not in variables_name_full:
+                    variables_name_full.add(var_name)
+                    v = getattr(self.concrete_model, var_name)
+                    self.vars_obj.append(v)
 
-    IPOPT = InteriorPointInterface(concrete_model, nlp_vars, nlp_full, pyomo_vars_full) 
-    IPOPT.set_bounds_relaxation_factor(bounds_relaxation_factor)
-    kkt = IPOPT.evaluate_primal_dual_kkt_matrix()
+        self.bounds_relaxation_factor = bounds_relaxation_factor
 
-    nlp_params = ProjectedExtendedNLP(nlp_full, param_order)
-
-    # Build the right hand side vector
-    Hessian = nlp_full.extract_submatrix_hessian_lag(pyomo_variables_rows=vars_obj, pyomo_variables_cols=parameters_name)
-    H_ineq = nlp_params.evaluate_jacobian_ineq()        
-    H_eq = nlp_params.evaluate_jacobian_eq()
-    
-    kkt_rhs = BlockMatrix(4, 1)
-    kkt_rhs.set_block(0, 0, Hessian)
-    kkt_rhs.set_block(1, 0, coo_matrix((nlp_full.n_ineq_constraints(), Hessian.shape[1])))
-    kkt_rhs.set_block(2, 0, H_eq)
-    kkt_rhs.set_block(3, 0, H_ineq)
-
-    if np.any(np.isnan(kkt.tocsc().todense())) or np.any(np.isinf(kkt.tocsc().todense())):
-        raise RuntimeError("This is a runtime error")
-    global is_first_call
-    global IPsolver
-    try:
-        if is_first_call:
-            IPsolver = IPOptions()
-            IPsolver.use_inertia_correction = True
-            # IPsolver.linalg.solver = MumpsInterface()
-            IPsolver.linalg.solver = ScipyInterface(compute_inertia=IPsolver.use_inertia_correction)
-            ds, IPsolver = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
-                                    is_first_call = is_first_call, IPoptions = IPsolver)
-            is_first_call = False
-        else:     
-            ds, _ = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
-                                        is_first_call = is_first_call, IPoptions = IPsolver)
-    except:
-        rhs = -kkt_rhs.toarray()
-        ds = np.zeros_like(rhs)
+    def get_sen(self, concrete_model):
+        """
+        Descriptions: 
+            Obtain the sensitivity matrix of decision variables with respect to the parameters.
         
-    dfullvar_dp = ds[:len(vars_order), :]
-    # ds = spsolve(kkt.tocsc(), -kkt_rhs.tocsc())
-    # dfullvar_dp = np.array(ds.todense())[:len(vars_order), :]
+        Args:
+            - concrete_model (``Pyomo model``, required)
+                The concrete instance has been solved by IPOPT, and the optimal values of primal and dual variables have been obtained.
+            - grad_parameters(``List[str]``, required)
+                A list of parameter name defined in Pyomo.
+            - variables_name_index(``List[str]``, required)
+                A list of indexed variable names
+        Returns:
+            The sensitivity matrix, left hand side of KKT matrix, right hand side of vector, and the order of variables
+        
+        Return type:
+            Matrix.
+        
+        Examples:
+            >>> concrete_model = pyo.ConcreteModel()
+            >>> solver.solve(concrete_model, tee=False)
+            >>> grad_parameters = ["Psqrt", "q", "A", "b"]
+            >>> variables_name_index = ["x[0]", "x[1]", "x[3]", "y"]
+            >>> param_order = ["Psqrt[0, 0]",... "q[0]"..., "A[0, 0]"..., "b[0]"...]
+            >>> vars_obj = [x, y] based on nlp.get_pyomo_variables()
+            >>> dvar_dp, lhs_Jac, rhs_Jac, variables_index_order = get_sen(concrete_model, grad_parameters, variables_name_index)
+        """
+        # Unfix the param variables for Jac/Hessian evaluation
+        for param in concrete_model.component_objects(pyo.Var):
+            if param in self.grad_parameters:
+                for index in param:
+                    param[index].unfix() 
 
-    if Debug:
-        return dfullvar_dp, kkt.tocsc().todense(), kkt_rhs.tocsc().todense(), duals
-    else:
-        return dfullvar_dp, 0, 0, duals
+        primals = []
+        for var in self.pyomo_vars_full:
+            primals.append(var.value)
+        self.nlp_full.set_primals(np.array(primals))
+
+        duals = []
+        for constraint in self.pyomo_cons:
+            duals.append(concrete_model.dual[constraint])
+        duals = - np.array(duals, dtype = np.float64)
+        self.nlp_full.set_duals(duals)
+
+        nlp_vars = ProjectedExtendedNLP(self.nlp_full, self.vars_order)
+
+        IPOPT = InteriorPointInterface(concrete_model, nlp_vars, self.nlp_full, self.pyomo_vars_full) 
+        IPOPT.set_bounds_relaxation_factor(self.bounds_relaxation_factor)
+        kkt = IPOPT.evaluate_primal_dual_kkt_matrix()
+
+        nlp_params = ProjectedExtendedNLP(self.nlp_full, self.param_order)
+
+        # Build the right hand side vector
+        Hessian = self.nlp_full.extract_submatrix_hessian_lag(pyomo_variables_rows=self.vars_obj, pyomo_variables_cols = self.grad_parameters)
+        H_ineq = nlp_params.evaluate_jacobian_ineq()        
+        H_eq = nlp_params.evaluate_jacobian_eq()
+        
+        kkt_rhs = BlockMatrix(4, 1)
+        kkt_rhs.set_block(0, 0, Hessian)
+        kkt_rhs.set_block(1, 0, coo_matrix((self.nlp_full.n_ineq_constraints(), Hessian.shape[1])))
+        kkt_rhs.set_block(2, 0, H_eq)
+        kkt_rhs.set_block(3, 0, H_ineq)
+
+        if np.any(np.isnan(kkt.tocsc().todense())) or np.any(np.isinf(kkt.tocsc().todense())):
+            raise RuntimeError("This is a runtime error")
+        global is_first_call
+        global IPsolver
+        try:
+            if is_first_call:
+                IPsolver = IPOptions()
+                IPsolver.use_inertia_correction = True
+                # IPsolver.linalg.solver = MumpsInterface()
+                IPsolver.linalg.solver = ScipyInterface(compute_inertia=IPsolver.use_inertia_correction)
+                ds, IPsolver = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
+                                        is_first_call = is_first_call, IPoptions = IPsolver)
+                is_first_call = False
+            else:     
+                ds, _ = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
+                                            is_first_call = is_first_call, IPoptions = IPsolver)
+        except:
+            rhs = -kkt_rhs.toarray()
+            ds = np.zeros_like(rhs)
+            
+        dfullvar_dp = ds[:len(self.vars_order), :]
+        # ds = spsolve(kkt.tocsc(), -kkt_rhs.tocsc())
+        # dfullvar_dp = np.array(ds.todense())[:len(vars_order), :]
+
+        if Debug:
+            return dfullvar_dp, kkt.tocsc().todense(), kkt_rhs.tocsc().todense(), duals
+        else:
+            return dfullvar_dp, 0, 0, duals

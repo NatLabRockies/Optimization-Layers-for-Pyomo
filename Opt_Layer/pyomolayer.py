@@ -7,7 +7,7 @@ sys.path.append('..')  # Add the parent directory to Python's search path
 import pyomo.environ as pyo
 from pyomo.contrib.pynumero.interfaces.pyomo_nlp import PyomoNLP
 import copy
-from Opt_Layer.utilities import get_sen
+from Opt_Layer.utilities import Sensitivity
 torch.set_default_dtype(torch.float64)
 import logging
 logging.getLogger('pyomo.core').setLevel(logging.ERROR)
@@ -110,31 +110,26 @@ class PyomoOptLayer(nn.Module):
                 self.vars_to_indices[p] = pyo.ComponentMap()
                 for idx, var in enumerate(p.values()):
                     self.vars_to_indices[p][var] = idx
-
-        self.param_order = []
-        for p_name in self.grad_parameters:
-            for i in p_name.index_set():
-                self.param_order.append(str(p_name[i]))
         
         self.get_nlp_full()
-        self.pyomo_cons = self.nlp_full.get_pyomo_constraints()
+        # self.pyomo_cons = self.nlp_full.get_pyomo_constraints()
         self.pyomo_vars_full = self.nlp_full.get_pyomo_variables()
         pyomo_variables_vars = self.nlp_var.get_pyomo_variables()
         pyomo_variables_vars_name = {var.name for var in pyomo_variables_vars} 
         # Obtain the variables index based on nlp_full.get_pyomo_variable, 
-        variables_name_full = set()
+        # variables_name_full = set()
         # Use nlp_var = ProjectedExtendedNLP(nlp_full, vars_order) in get_sen() function, make sure the var_order matches nlp_full.pyomo_variables()
         self.vars_order = []
-        self.vars_obj = [] # nlp.extract_submatrix_hessian_lag(vars_obj) follows nlp_full pyomo_variables order
+        # self.vars_obj = [] # nlp.extract_submatrix_hessian_lag(vars_obj) follows nlp_full pyomo_variables order
         for var in self.pyomo_vars_full:
             # actual vars
             if var.name in pyomo_variables_vars_name:
                 self.vars_order.append(var.name)
-                var_name = var.parent_component().name
-                if var_name not in variables_name_full:
-                    variables_name_full.add(var_name)
-                    v = getattr(self.concrete_model, var_name)
-                    self.vars_obj.append(v)
+                # var_name = var.parent_component().name
+                # if var_name not in variables_name_full:
+                    # variables_name_full.add(var_name)
+                    # v = getattr(self.concrete_model, var_name)
+                    # self.vars_obj.append(v)
         
         # obtain the order difference of nlp_full.get_pyomo_variable and variables given by the user
         vars_name_index = []
@@ -143,6 +138,9 @@ class PyomoOptLayer(nn.Module):
         self.variables_index_order = []
         for var in vars_name_index:
             self.variables_index_order.append(self.vars_order.index(var))
+
+        self.sensitivity = Sensitivity(concrete_model = self.concrete_model, grad_parameters = self.grad_parameters, \
+                                       nlp_full = self.nlp_full, nlp_var = self.nlp_var, bounds_relaxation_factor = self.solver.options["bound_relax_factor"])
 
     def forward(self, *batch_params):
         """
@@ -175,9 +173,7 @@ class PyomoOptLayer(nn.Module):
             f = PyomoLayerFn(concrete_model = self.concrete_model, variables = self.variables,  \
                             parameters = self.parameter, parameters_size = self.parameters_size, vars_to_indices = self.vars_to_indices, \
                             known_parameters = self.known_parameters, grad_parameters = self.grad_parameters, \
-                            param_order = self.param_order, vars_obj = self.vars_obj, vars_order = self.vars_order,  \
-                            variables_index_order = self.variables_index_order, nlp_full = self.nlp_full, nlp_var = self.nlp_var, \
-                            pyomo_cons = self.pyomo_cons, pyomo_vars_full = self.pyomo_vars_full, solver = self.solver)
+                            variables_index_order = self.variables_index_order, solver = self.solver, sensitivity = self.sensitivity)
 
             sol = f(*batch_params)
         else:
@@ -189,7 +185,7 @@ class PyomoOptLayer(nn.Module):
         return sol
         
 def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to_indices, known_parameters, grad_parameters, \
-                 param_order, vars_obj, vars_order, variables_index_order, nlp_full, nlp_var, pyomo_cons, pyomo_vars_full, solver):
+                 variables_index_order, solver, sensitivity):
     """
     Descriptions: 
         The forward and backward function for the PyomoOptLayer module.
@@ -235,7 +231,7 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
                     vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(True)
                  
                 # A Jacobian matrix of the (decision variables) with respect to parameters
-                dfullvar_dp, lhs_Jac, rhs_Jac, duals = get_sen(concrete_model, grad_parameters, param_order, vars_obj, vars_order, nlp_full, nlp_var, pyomo_cons, pyomo_vars_full, solver.options["bound_relax_factor"])
+                dfullvar_dp, lhs_Jac, rhs_Jac, duals = sensitivity.get_sen(concrete_model)
                 if batch == 0:
                     primal_out = torch.zeros((batch_params[0].shape[0], len(vars)))
                     dual_out = torch.zeros((batch_params[0].shape[0], len(duals)))
