@@ -303,8 +303,7 @@ class InteriorPointInterface:
 
 
 class Sensitivity:
-    def __init__(self, concrete_model, grad_parameters, nlp_full, nlp_var, bounds_relaxation_factor):
-        self.concrete_model = concrete_model
+    def __init__(self, grad_parameters, nlp_full, nlp_var, vars_order, vars_obj, bounds_relaxation_factor):
         self.grad_parameters = grad_parameters
         self.nlp_full = nlp_full
         self.nlp_var = nlp_var
@@ -316,22 +315,8 @@ class Sensitivity:
 
         self.pyomo_cons = self.nlp_full.get_pyomo_constraints()
         self.pyomo_vars_full = self.nlp_full.get_pyomo_variables()
-        pyomo_variables_vars = self.nlp_var.get_pyomo_variables()
-        pyomo_variables_vars_name = {var.name for var in pyomo_variables_vars} 
-        # Obtain the variables index based on nlp_full.get_pyomo_variable, 
-        variables_name_full = set()
-        # Use nlp_var = ProjectedExtendedNLP(nlp_full, vars_order) in get_sen() function, make sure the var_order matches nlp_full.pyomo_variables()
-        self.vars_order = []
-        self.vars_obj = [] # nlp.extract_submatrix_hessian_lag(vars_obj) follows nlp_full pyomo_variables order
-        for var in self.pyomo_vars_full:
-            # actual vars
-            if var.name in pyomo_variables_vars_name:
-                self.vars_order.append(var.name)
-                var_name = var.parent_component().name
-                if var_name not in variables_name_full:
-                    variables_name_full.add(var_name)
-                    v = getattr(self.concrete_model, var_name)
-                    self.vars_obj.append(v)
+        self.vars_order = vars_order
+        self.vars_obj = vars_obj 
 
         self.bounds_relaxation_factor = bounds_relaxation_factor
 

@@ -117,19 +117,19 @@ class PyomoOptLayer(nn.Module):
         pyomo_variables_vars = self.nlp_var.get_pyomo_variables()
         pyomo_variables_vars_name = {var.name for var in pyomo_variables_vars} 
         # Obtain the variables index based on nlp_full.get_pyomo_variable, 
-        # variables_name_full = set()
+        variables_name_full = set()
         # Use nlp_var = ProjectedExtendedNLP(nlp_full, vars_order) in get_sen() function, make sure the var_order matches nlp_full.pyomo_variables()
         self.vars_order = []
-        # self.vars_obj = [] # nlp.extract_submatrix_hessian_lag(vars_obj) follows nlp_full pyomo_variables order
+        self.vars_obj = [] # nlp.extract_submatrix_hessian_lag(vars_obj) follows nlp_full pyomo_variables order
         for var in self.pyomo_vars_full:
             # actual vars
             if var.name in pyomo_variables_vars_name:
                 self.vars_order.append(var.name)
-                # var_name = var.parent_component().name
-                # if var_name not in variables_name_full:
-                    # variables_name_full.add(var_name)
-                    # v = getattr(self.concrete_model, var_name)
-                    # self.vars_obj.append(v)
+                var_name = var.parent_component().name
+                if var_name not in variables_name_full:
+                    variables_name_full.add(var_name)
+                    v = getattr(self.concrete_model, var_name)
+                    self.vars_obj.append(v)
         
         # obtain the order difference of nlp_full.get_pyomo_variable and variables given by the user
         vars_name_index = []
@@ -139,8 +139,8 @@ class PyomoOptLayer(nn.Module):
         for var in vars_name_index:
             self.variables_index_order.append(self.vars_order.index(var))
 
-        self.sensitivity = Sensitivity(concrete_model = self.concrete_model, grad_parameters = self.grad_parameters, \
-                                       nlp_full = self.nlp_full, nlp_var = self.nlp_var, bounds_relaxation_factor = self.solver.options["bound_relax_factor"])
+        self.sensitivity = Sensitivity(grad_parameters = self.grad_parameters, nlp_full = self.nlp_full, nlp_var = self.nlp_var, \
+                                       vars_order = self.vars_order, vars_obj = self.vars_obj, bounds_relaxation_factor = self.solver.options["bound_relax_factor"])
 
     def forward(self, *batch_params):
         """
@@ -199,37 +199,8 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             # solve over minibatch by just iterating
             for batch in range(batch_params[0].shape[0]):
                 params = [p[batch] for p in batch_params]
-                with torch.no_grad():
-                    params_ = [p.detach().clone().double().numpy() for p in params]
-                    for index, p_name in enumerate(parameters):
-                        params_flat = params_[index].reshape(-1)
-                        if not p_name.is_indexed():
-                            p_name.fix(params_flat)
-                        else:
-                            for var, idx in vars_to_indices[p_name].items():
-                                var.fix(params_flat[idx])
-                    end_ = index + 1
-                    if known_parameters:
-                        for index, p_name in enumerate(known_parameters):
-                            params_flat = params_[end_ + index].reshape(-1)
-                            for idx, p_idx in enumerate(p_name.keys()):
-                                p_name[p_idx] = params_flat[idx] 
-                            
-                    # concrete_model = model(*params_)
-                    result = solver.solve(concrete_model, tee=False)
-                    # TODO mini slack -> training obj is 0 -> 
-                    if not pyo.check_optimal_termination(result):
-                        raise RuntimeError("IPOPT failed to converge!")
-                    # should add a post-processing function to help project to the closest decision variables. 
-                    # decision variables
-                    #concrete_model.pprint
-                    # concrete_model.display()
-                    # concrete_model.obj()
-                    vars = []
-                    for var in variables:
-                        vars += [var[i].value for i in var]
-                    vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(True)
-                 
+                vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
+                vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(True)
                 # A Jacobian matrix of the (decision variables) with respect to parameters
                 dfullvar_dp, lhs_Jac, rhs_Jac, duals = sensitivity.get_sen(concrete_model)
                 if batch == 0:
@@ -275,39 +246,10 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
     class PyomoLayerFnFn_eval(torch.autograd.Function):
         @staticmethod
         def forward(ctx, *batch_params):
-            # solve over minibatch by just iterating
             for batch in range(batch_params[0].shape[0]):
                 params = [p[batch] for p in batch_params]
-                with torch.no_grad():
-                    params_ = [p.detach().clone().double().numpy() for p in params]
-                    for index, p_name in enumerate(parameters):
-                        params_flat = params_[index].reshape(-1)
-                        if not p_name.is_indexed():
-                            p_name.fix(params_flat)
-                        else:
-                            for var, idx in vars_to_indices[p_name].items():
-                                var.fix(params_flat[idx])
-                    end_ = index + 1
-                    if known_parameters:
-                        for index, p_name in enumerate(known_parameters):
-                            params_flat = params_[end_ + index].reshape(-1)
-                            for idx, p_idx in enumerate(p_name.keys()):
-                                p_name[p_idx] = params_flat[idx] 
-                            
-                    # concrete_model = model(*params_)
-                    solver.solve(concrete_model, tee=False)
-                    # TODO mini slack -> training obj is 0 -> 
-                    # if not pyo.check_optimal_termination(results):
-                    #     raise RuntimeWarning("IPOPT failed to converge! Watch out!")
-                    # should add a post-processing function to help project to the closest decision variables. 
-                    # decision variables
-                    #concrete_model.pprint
-                    # concrete_model.display()
-                    # concrete_model.obj()
-                    vars = []
-                    for var in variables:
-                        vars += [var[i].value for i in var]
-                    vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(True)
+                vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
+                vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(False)
 
                 if batch == 0:
                     primal_out = torch.zeros((batch_params[0].shape[0], len(vars)))
@@ -319,3 +261,29 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
             return None
 
     return PyomoLayerFnFn_eval.apply
+
+def single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params):
+    # solve over minibatch by just iterating
+    with torch.no_grad():
+        params_ = [p.detach().clone().double().numpy() for p in params]
+        for index, p_name in enumerate(parameters):
+            params_flat = params_[index].reshape(-1)
+            if not p_name.is_indexed():
+                p_name.fix(params_flat)
+            else:
+                for var, idx in vars_to_indices[p_name].items():
+                    var.fix(params_flat[idx])
+        end_ = index + 1
+        if known_parameters:
+            for index, p_name in enumerate(known_parameters):
+                params_flat = params_[end_ + index].reshape(-1)
+                for idx, p_idx in enumerate(p_name.keys()):
+                    p_name[p_idx] = params_flat[idx] 
+                
+        result = solver.solve(concrete_model, tee=False)
+        if not pyo.check_optimal_termination(result):
+            raise RuntimeError("IPOPT failed to converge!")
+        vars = []
+        for var in variables:
+            vars += [var[i].value for i in var]
+    return vars
