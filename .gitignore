@@ -1,8 +1,10 @@
+examples/results_12172024
+examples/results
+Opt_Layer/__pycache__
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-
 # C extensions
 *.so
 

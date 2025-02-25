@@ -40,7 +40,7 @@ import sys
 import os
 current_dir = os.getcwd()
 sys.path.append(current_dir) # Add the parent directory to Python's search path
-results_dir = os.path.join(current_dir, "examples/results_12172024")
+results_dir = os.path.join(current_dir, "examples/results")
 
 import pyomo.environ as pyo
 import numpy as np
@@ -173,7 +173,7 @@ def main():
         print("(iter %d) loss: %g " % (i, results[-1]))
 
     np.save(os.path.join(results_dir, "cadp_results"), results)
-    cadp_cvx_results = np.load(os.path.join(results_dir, "cadp_cvx_results.npy"))
+    cadp_cvx_results = np.load(os.path.join(os.path.join(current_dir, "examples/results_12172024"), "cadp_cvx_results.npy"))
     plt.plot(results, label = "Pyomo")
     plt.plot(cadp_cvx_results, label = "CVX")
     plt.legend()
