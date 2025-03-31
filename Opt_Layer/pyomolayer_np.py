@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from mpi4py import MPI
 import copy
 import torch.nn as nn
 import sys
@@ -13,13 +12,6 @@ from Opt_Layer.utilities import Sensitivity
 torch.set_default_dtype(torch.float64)
 import logging
 logging.getLogger('pyomo.core').setLevel(logging.ERROR)
-import time
-
-comm = MPI.COMM_WORLD  # Initialize MPI
-rank = comm.Get_rank()  # Process ID
-size = comm.Get_size()  # Total MPI processes
-
-print(f"Process {rank}/{size}: MPI initialized", flush=True)
 
 class PyomoOptLayer(nn.Module):
     """
@@ -79,7 +71,7 @@ class PyomoOptLayer(nn.Module):
         self.free_parameters = free_parameters
         self.nlp_var = PyomoNLP(concrete_model)
         self.init_pyomo_varorder()
-
+        self.training = True
         
     def get_nlp_full(self):
         model = self.concrete_model
@@ -178,18 +170,19 @@ class PyomoOptLayer(nn.Module):
             f = PyomoLayerFn(concrete_model = self.concrete_model, variables = self.variables,  \
                             parameters = self.parameter, parameters_size = self.parameters_size, vars_to_indices = self.vars_to_indices, \
                             known_parameters = self.known_parameters, grad_parameters = self.grad_parameters, \
-                            variables_index_order = self.variables_index_order, solver = self.solver, sensitivity = self.sensitivity, train_mode = True)
+                            variables_index_order = self.variables_index_order, solver = self.solver, sensitivity = self.sensitivity)
+
             sol = f(*batch_params)
         else:
             with torch.no_grad(): 
                 f = PyomoLayerFn_eval(concrete_model = self.concrete_model, variables = self.variables,  \
                             parameters = self.parameter, vars_to_indices = self.vars_to_indices, \
-                            known_parameters = self.known_parameters, solver = self.solver, train_mode = False)
+                            known_parameters = self.known_parameters, solver = self.solver)
                 sol = f(*batch_params)
         return sol
         
 def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to_indices, known_parameters, grad_parameters, \
-                 variables_index_order, solver, sensitivity, train_mode):
+                 variables_index_order, solver, sensitivity):
     """
     Descriptions: 
         The forward and backward function for the PyomoOptLayer module.
@@ -197,70 +190,30 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
     class PyomoLayerFnFn(torch.autograd.Function):
         @staticmethod
         def forward(ctx, *batch_params):
-            local_primal_out = []
-            local_dual_out = []
-            local_J = []
-            batch_size = batch_params[0].shape[0]
-            # Split batch indices across MPI ranks
-            local_batches = [i for i in range(batch_size) if i % size == rank]  # More balanced distribution 
-            # Each MPI process solves only its assigned batches
-            for batch in local_batches:
-                params = [p[batch] for p in batch_params]  # Get batch parameters
-                # TODO single_solve(concrete_modified_model)
+            J = []
+            lhs_J = []
+            rhs_J = []
+            # solve over minibatch by just iterating
+            for batch in range(batch_params[0].shape[0]):
+                params = [p[batch] for p in batch_params]
                 vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
-                # vars = torch.tensor(vars, dtype=batch_params[0].dtype, device=batch_params[0].device).view(-1).requires_grad_(True)
-                # start_time = time.time()
+                vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(True)
+                # A Jacobian matrix of the (decision variables) with respect to parameters
                 dfullvar_dp, lhs_Jac, rhs_Jac, duals = sensitivity.get_sen(concrete_model)
-                grad = dfullvar_dp[variables_index_order, :]
-                local_primal_out.append(vars)
-                local_dual_out.append(duals)
-                local_J.append(grad)
-
-            # local_primal_out = torch.stack(local_primal_out) if local_primal_out else torch.empty((0, len(vars)))
-            # local_dual_out = torch.stack(local_dual_out) if local_dual_out else torch.empty((0, len(duals)))
-            # all_primal_out = comm.gather(local_primal_out, root=0)
-            local_primal_out = np.array(local_primal_out)
-            local_dual_out = np.array(local_dual_out)
-            local_J = np.array(local_J)
-            # recvbuf = np.empty(size * local_primal_out.size)
-            # comm.Allgather(local_primal_out, recvbuf)
-            # all_primal_out = recvbuf.reshape(size, local_primal_out.shape[0], local_primal_out.shape[1])
-
-            # recvbuf_dual = np.empty(size * local_dual_out.size)
-            # comm.Allgather(local_dual_out, recvbuf_dual)
-            # all_dual_out = recvbuf_dual.reshape(size, local_dual_out.shape[0], local_dual_out.shape[1])
-            all_primal_out = comm.allgather(local_primal_out)
-            all_dual_out = comm.allgather(local_dual_out)
-            # recvbuf_J = np.empty(size * local_J.size)
-            # comm.Allgather(local_J, recvbuf_J)
-            # all_J = recvbuf_J.reshape(size, local_J.shape[0], local_J.shape[1], local_J.shape[2])
-            all_J = comm.allgather(local_J)
-            # all_dual_out = comm.allgather(local_dual_out)
-            # all_J = comm.allgather(local_J)
-
-            primal_out, dual_out, J, lhs_J, rhs_J = None, None, [], [], []
-
-            all_primal_out = [arr for arr in all_primal_out if arr.size > 0]
-            all_dual_out = [arr for arr in all_dual_out if arr.size > 0]
-            all_J = [arr for arr in all_J if arr.size > 0]
-
-            primal_out = torch.from_numpy(np.concatenate(all_primal_out, axis=0)).requires_grad_(True)
-            dual_out = torch.from_numpy(np.concatenate(all_dual_out, axis=0)).requires_grad_(True)
-            J = torch.from_numpy(np.concatenate(all_J, axis=0)).requires_grad_(False)
-            ctx.save_for_backward(J)
-
-            # J = [item for sublist in all_J for item in sublist]
-            # primal_out = torch.cat([r for r in all_primal_out if r.numel() > 0], dim=0)
-            # dual_out = torch.cat([r for r in all_dual_out if r.numel() > 0], dim=0)
-            # J = [item for sublist in all_J for item in sublist]
-            # primal_out = comm.bcast(primal_out if rank == 0 else None, root=0)
-            # dual_out = comm.bcast(dual_out if rank == 0 else None, root=0)
-            # J = comm.bcast(J if rank == 0 else None, root=0)
-            # ctx.save_for_backward(torch.tensor(np.array(J), dtype=torch.float64))
+                if batch == 0:
+                    primal_out = torch.zeros((batch_params[0].shape[0], len(vars)))
+                    dual_out = torch.zeros((batch_params[0].shape[0], len(duals)))
+                primal_out[batch] = vars
+                dual_out[batch] = torch.tensor(duals)
+                J.append(dfullvar_dp[variables_index_order, :])
+                lhs_J.append(lhs_Jac)
+                rhs_J.append(rhs_Jac)
+            ctx.save_for_backward(torch.tensor(np.array(J), dtype=torch.float64))
             return primal_out, dual_out, lhs_J, rhs_J
 
         @staticmethod
         def backward(ctx, grad_out, dual_dummy = 0, Jac_dummy = 0, rhs_dummy = 0):
+            
             batch_size = grad_out.shape[0]
             Jac, = ctx.saved_tensors
             grad = (Jac.transpose(1, 2).bmm(grad_out.unsqueeze(-1))).squeeze(-1)
@@ -279,9 +232,10 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
                 grad_reshape.extend([None] * len(known_parameters))
             grad_reshape = tuple(grad_reshape)
             return *grad_reshape, None
+
     return PyomoLayerFnFn.apply
 
-def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, train_mode):
+def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver):
     """
     Descriptions: 
         The forward and backward function for the PyomoOptLayer module.
@@ -289,30 +243,14 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
     class PyomoLayerFnFn_eval(torch.autograd.Function):
         @staticmethod
         def forward(ctx, *batch_params):
-            batch_size = batch_params[0].shape[0]
-            # Split batch indices across MPI ranks
-            local_batches = [i for i in range(batch_size) if i % size == rank]  # More balanced distribution 
-            # Each MPI process solves only its assigned batches
-            local_results = []
-            for batch in local_batches:
-                params = [p[batch] for p in batch_params]  # Get batch parameters
+            for batch in range(batch_params[0].shape[0]):
+                params = [p[batch] for p in batch_params]
                 vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
-                # vars = torch.tensor(vars, dtype=batch_params[0].dtype, device=batch_params[0].device).view(-1).requires_grad_(False)
-                local_results.append(vars)
+                vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(False)
 
-            # Gather results at rank 0
-            all_results = comm.allgather(local_results)
-
-            primal_out = torch.from_numpy(np.concatenate(all_results, axis=0)).requires_grad_(False)
-
-            # for batch in range(batch_params[0].shape[0]):
-            #     params = [p[batch] for p in batch_params]
-            #     vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
-            #     vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(False)
-
-            #     if batch == 0:
-            #         primal_out = torch.zeros((batch_params[0].shape[0], len(vars)))
-            #     primal_out[batch] = vars
+                if batch == 0:
+                    primal_out = torch.zeros((batch_params[0].shape[0], len(vars)))
+                primal_out[batch] = vars
             return primal_out, None, None, None
 
         @staticmethod
