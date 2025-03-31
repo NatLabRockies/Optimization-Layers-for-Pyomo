@@ -247,6 +247,7 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             primal_out = torch.from_numpy(np.concatenate(all_primal_out, axis=0)).requires_grad_(True)
             dual_out = torch.from_numpy(np.concatenate(all_dual_out, axis=0)).requires_grad_(True)
             J = torch.from_numpy(np.concatenate(all_J, axis=0)).requires_grad_(False)
+
             ctx.save_for_backward(J)
 
             # J = [item for sublist in all_J for item in sublist]
@@ -297,12 +298,11 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
             for batch in local_batches:
                 params = [p[batch] for p in batch_params]  # Get batch parameters
                 vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
-                # vars = torch.tensor(vars, dtype=batch_params[0].dtype, device=batch_params[0].device).view(-1).requires_grad_(False)
                 local_results.append(vars)
 
-            # Gather results at rank 0
+            local_results = np.array(local_results)
             all_results = comm.allgather(local_results)
-
+            all_results = [arr for arr in all_results if arr.size > 0]
             primal_out = torch.from_numpy(np.concatenate(all_results, axis=0)).requires_grad_(False)
 
             # for batch in range(batch_params[0].shape[0]):
