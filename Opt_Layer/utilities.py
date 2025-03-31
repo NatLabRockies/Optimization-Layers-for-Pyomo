@@ -7,17 +7,18 @@ from Opt_Layer.parapint.interior_point import IPOptions, ip_solve_optimal
 from Opt_Layer.parapint.interface import BaseInteriorPointInterface
 from Opt_Layer.parapint.mumps_interface import MumpsInterface
 from Opt_Layer.parapint.scipy_interface import ScipyInterface
+from Opt_Layer.parapint.ma27_interface import InteriorPointMA27Interface
 
 import pyomo.environ as pyo
 from pyomo.contrib.pynumero.interfaces.pyomo_nlp import PyomoNLP
 from pyomo.contrib.pynumero.interfaces.nlp_projections import ProjectedExtendedNLP
 from pyomo.contrib.pynumero.sparse import BlockMatrix, BlockVector
 from pyomo.common.timing import HierarchicalTimer
-Debug = False
-is_first_call = True
 torch.set_default_dtype(torch.float64)
+from pyomo.common.dependencies import attempt_import
 
-#class InteriorPointInterface(BaseInteriorPointInterface):
+mpi4py, mpi4py_available = attempt_import("mpi4py", error_message="mpi4py is not available")
+
 class InteriorPointInterface:
     """
     Descriptions:
@@ -303,10 +304,18 @@ class InteriorPointInterface:
 
 
 class Sensitivity:
-    def __init__(self, grad_parameters, nlp_full, nlp_var, vars_order, vars_obj, bounds_relaxation_factor):
-        self.grad_parameters = grad_parameters
-        self.nlp_full = nlp_full
-        self.nlp_var = nlp_var
+    def __init__(self, pyomo_layer, comm=None):
+        self.grad_parameters = pyomo_layer.grad_parameters
+        self.nlp_full = pyomo_layer.nlp_full
+        self.nlp_var = pyomo_layer.nlp_var
+
+        if mpi4py_available:
+            from mpi4py import MPI
+            if comm is None:
+                comm = MPI.COMM_WORLD
+            rank_comm = comm.Split(comm.rank, 0)
+        else:
+            rank_comm = None
 
         self.param_order = []
         for p_name in self.grad_parameters:
@@ -315,10 +324,17 @@ class Sensitivity:
 
         self.pyomo_cons = self.nlp_full.get_pyomo_constraints()
         self.pyomo_vars_full = self.nlp_full.get_pyomo_variables()
-        self.vars_order = vars_order
-        self.vars_obj = vars_obj 
+        self.var_names = pyomo_layer.var_names
+        self.vars_objs = pyomo_layer.vars_objs 
+        self.bounds_relaxation_factor = pyomo_layer.solver.options["bound_relax_factor"]
 
-        self.bounds_relaxation_factor = bounds_relaxation_factor
+        self.is_first_call = True
+        self.debug = False
+        self.IPsolver = IPOptions()
+        self.IPsolver.use_inertia_correction = True
+        self.IPsolver.linalg.solver = MumpsInterface(comm=rank_comm)
+        # self.IPsolver.linalg.solver = InteriorPointMA27Interface()
+        # self.IPsolver.linalg.solver = ScipyInterface(compute_inertia=self.IPsolver.use_inertia_correction)
 
     def get_sen(self, concrete_model):
         """
@@ -344,7 +360,7 @@ class Sensitivity:
             >>> grad_parameters = ["Psqrt", "q", "A", "b"]
             >>> variables_name_index = ["x[0]", "x[1]", "x[3]", "y"]
             >>> param_order = ["Psqrt[0, 0]",... "q[0]"..., "A[0, 0]"..., "b[0]"...]
-            >>> vars_obj = [x, y] based on nlp.get_pyomo_variables()
+            >>> vars_objs = [x, y] based on nlp.get_pyomo_variables()
             >>> dvar_dp, lhs_Jac, rhs_Jac, variables_index_order = get_sen(concrete_model, grad_parameters, variables_name_index)
         """
         # Unfix the param variables for Jac/Hessian evaluation
@@ -364,7 +380,7 @@ class Sensitivity:
         duals = - np.array(duals, dtype = np.float64)
         self.nlp_full.set_duals(duals)
 
-        nlp_vars = ProjectedExtendedNLP(self.nlp_full, self.vars_order)
+        nlp_vars = ProjectedExtendedNLP(self.nlp_full, self.var_names)
 
         IPOPT = InteriorPointInterface(concrete_model, nlp_vars, self.nlp_full, self.pyomo_vars_full) 
         IPOPT.set_bounds_relaxation_factor(self.bounds_relaxation_factor)
@@ -373,7 +389,7 @@ class Sensitivity:
         nlp_params = ProjectedExtendedNLP(self.nlp_full, self.param_order)
 
         # Build the right hand side vector
-        Hessian = self.nlp_full.extract_submatrix_hessian_lag(pyomo_variables_rows=self.vars_obj, pyomo_variables_cols = self.grad_parameters)
+        Hessian = self.nlp_full.extract_submatrix_hessian_lag(pyomo_variables_rows=self.vars_objs, pyomo_variables_cols = self.grad_parameters)
         H_ineq = nlp_params.evaluate_jacobian_ineq()        
         H_eq = nlp_params.evaluate_jacobian_eq()
         
@@ -385,29 +401,22 @@ class Sensitivity:
 
         if np.any(np.isnan(kkt.tocsc().todense())) or np.any(np.isinf(kkt.tocsc().todense())):
             raise RuntimeError("This is a runtime error")
-        global is_first_call
-        global IPsolver
-        try:
-            if is_first_call:
-                IPsolver = IPOptions()
-                IPsolver.use_inertia_correction = True
-                # IPsolver.linalg.solver = MumpsInterface()
-                IPsolver.linalg.solver = ScipyInterface(compute_inertia=IPsolver.use_inertia_correction)
-                ds, IPsolver = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
-                                        is_first_call = is_first_call, IPoptions = IPsolver)
-                is_first_call = False
-            else:     
-                ds, _ = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
-                                            is_first_call = is_first_call, IPoptions = IPsolver)
-        except:
-            rhs = -kkt_rhs.toarray()
-            ds = np.zeros_like(rhs)
-            
-        dfullvar_dp = ds[:len(self.vars_order), :]
+        
+        if self.is_first_call:
+            ds, self.IPsolver = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
+                                    is_first_call = self.is_first_call, IPoptions = self.IPsolver)
+            self.is_first_call = False
+        else:   
+            ds, _ = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
+                                        is_first_call = self.is_first_call, IPoptions = self.IPsolver)
+        # except:
+        #     rhs = -kkt_rhs.toarray()
+        #     ds = np.zeros_like(rhs)
+        dfullvar_dp = ds[:len(self.var_names), :]
         # ds = spsolve(kkt.tocsc(), -kkt_rhs.tocsc())
-        # dfullvar_dp = np.array(ds.todense())[:len(vars_order), :]
+        # dfullvar_dp = np.array(ds.todense())[:len(var_names), :]
 
-        if Debug:
+        if self.debug:
             return dfullvar_dp, kkt.tocsc().todense(), kkt_rhs.tocsc().todense(), duals
         else:
             return dfullvar_dp, 0, 0, duals
