@@ -1,11 +1,9 @@
-import sys
+from .base_linear_solver_interface import LinearSolverInterface
+from .results import LinearSolverStatus, LinearSolverResults
 from pyomo.common.dependencies import attempt_import
 from scipy.sparse import isspmatrix_coo, tril
 from collections import OrderedDict
 import numpy as np
-
-from .base_linear_solver_interface import LinearSolverInterface
-from .results import LinearSolverStatus, LinearSolverResults
 mumps, mumps_available = attempt_import(name='pyomo.contrib.pynumero.linalg.mumps_interface',
                                         error_message='pymumps is required to use the MumpsInterface')
 
