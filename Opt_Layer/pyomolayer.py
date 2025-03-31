@@ -202,7 +202,8 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             local_J = []
             batch_size = batch_params[0].shape[0]
             # Split batch indices across MPI ranks
-            local_batches = [i for i in range(batch_size) if i % size == rank]  # More balanced distribution 
+            # local_batches = [i for i in range(batch_size) if i % size == rank]  # More balanced distribution 
+            local_batches = rank_partition(rank, size, batch_size)
             # Each MPI process solves only its assigned batches
             for batch in local_batches:
                 params = [p[batch] for p in batch_params]  # Get batch parameters
@@ -292,7 +293,8 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
         def forward(ctx, *batch_params):
             batch_size = batch_params[0].shape[0]
             # Split batch indices across MPI ranks
-            local_batches = [i for i in range(batch_size) if i % size == rank]  # More balanced distribution 
+            # local_batches = [i for i in range(batch_size) if i % size == rank]  # More balanced distribution 
+            local_batches = rank_partition(rank, size, batch_size)
             # Each MPI process solves only its assigned batches
             local_results = []
             for batch in local_batches:
@@ -320,6 +322,14 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
             return None
 
     return PyomoLayerFnFn_eval.apply
+
+def rank_partition(rank, size, batch_size):
+    base = batch_size // size
+    remainder = batch_size % size
+
+    start = rank * base + min(rank, remainder)
+    end = start + base + (1 if rank < remainder else 0)
+    return list(range(start, end))
 
 def single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params):
     # solve over minibatch by just iterating
