@@ -81,19 +81,20 @@ class PyomoOptLayer(nn.Module):
         self.init_pyomo_varorder()
 
         
-    def get_nlp_full(self):
+    def get_nlp_full(self, para):
         model = self.concrete_model
         # Unfix the param variables for Jac/Hessian evaluation
         for param in model.component_objects(pyo.Var):
-            if param in self.parameter:
+            if param in para:
                 for index in param:
                     param[index].unfix() 
-        self.nlp_full = PyomoNLP(model)
+        nlp_full = PyomoNLP(model)
         # Fix the param variables
         for param in model.component_objects(pyo.Var):
-            if param in self.parameter:
+            if param in para:
                 for index in param:
                     param[index].fix()
+        return nlp_full
     
     def init_pyomo_varorder(self):
         if self.free_parameters:
@@ -120,7 +121,7 @@ class PyomoOptLayer(nn.Module):
                 for idx, var in enumerate(p.values()):
                     self.vars_to_indices[p][var] = idx
         
-        self.get_nlp_full()
+        self.nlp_full = self.get_nlp_full(para = self.parameter)
         # self.pyomo_cons = self.nlp_full.get_pyomo_constraints()
         pyomo_vars_full = self.nlp_full.get_pyomo_variables()
         pyomo_variables_vars = ComponentSet(self.nlp_var.get_pyomo_variables())
