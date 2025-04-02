@@ -85,13 +85,13 @@ class PyomoOptLayer(nn.Module):
         model = self.concrete_model
         # Unfix the param variables for Jac/Hessian evaluation
         for param in model.component_objects(pyo.Var):
-            if param in self.grad_parameters:
+            if param in self.parameter:
                 for index in param:
                     param[index].unfix() 
         self.nlp_full = PyomoNLP(model)
         # Fix the param variables
         for param in model.component_objects(pyo.Var):
-            if param in self.grad_parameters:
+            if param in self.parameter:
                 for index in param:
                     param[index].fix()
     
