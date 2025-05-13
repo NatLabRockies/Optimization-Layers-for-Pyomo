@@ -37,23 +37,28 @@ class InteriorPointInterface:
         >>> IPOPT_module = InteriorPointInterface(nlp)
     """
 
-    def __init__(self, concreate_model, nlp, nlp_full, pyomo_vars_full):
+    def __init__(self, concreate_model, nlp, nlp_full, pyomo_vars):
 
         self.concreate_model = concreate_model
         self._nlp = nlp
         self._nlp_full = nlp_full
-        self.pyomo_vars_full = pyomo_vars_full
+        self.pyomo_vars = pyomo_vars
         self._slacks = self._nlp.evaluate_ineq_constraints()
 
         # set the init_duals_primals_lb/ub from ipopt_zL_out, ipopt_zU_out if available
         # need to compress them as well and initialize the duals_primals_lb/ub
         # only have the duals_primals_lb and ub for the vars.
         (self._init_duals_primals_lb, self._init_duals_primals_ub) = (self._get_full_duals_primals_bounds())
+        # print("self._init_duals_primals_lb", self._init_duals_primals_lb)
+        # print("self._init_duals_primals_ub", self._init_duals_primals_ub)
+        # print("primal value", self._nlp.get_primals())
+        # print("self._nlp.primals_lb()", self._nlp.primals_lb())
         self._init_duals_primals_lb[np.isneginf(self._nlp.primals_lb())] = 0
         self._init_duals_primals_ub[np.isinf(self._nlp.primals_ub())] = 0
         self._duals_primals_lb = self._init_duals_primals_lb.copy()
         self._duals_primals_ub = self._init_duals_primals_ub.copy()
-
+        # print("self._duals_primals_lb", self._duals_primals_lb)
+        
         # set the init_duals_slacks_lb/ub from the init_duals_ineq
         # need to be compressed and set according to their sign
         # (-) value indicates it the upper is active, while (+) indicates
@@ -64,7 +69,6 @@ class InteriorPointInterface:
         self._duals_slacks_ub = -self._nlp_full.get_duals_ineq().copy()
         self._duals_slacks_ub[self._duals_slacks_ub > 0] = 0
         self._duals_slacks_ub *= -1.0
-
         self.bounds_relaxation_factor = 1e-8
 
     def get_bounds_relaxation_factor(self) -> float:
@@ -265,27 +269,24 @@ class InteriorPointInterface:
         if hasattr(self._nlp_full, 'pyomo_model') and hasattr(self._nlp_full, 'get_pyomo_variables'):
             # pyomo_model = self._nlp_full.pyomo_model()
             pyomo_model = self.concreate_model
-            pyomo_variables = self.pyomo_vars_full
+            pyomo_variables = self.pyomo_vars
             # pyomo_variables = self._nlp_full.get_pyomo_variables()
-            # pyomo_variables contains vars and params, but onlt set the duals for vars (self._nlp.n_primals())
+            # pyomo_variables contains vars and params, but only set the duals for vars (self._nlp.n_primals())
             if not hasattr(pyomo_model, 'dual'):
                 raise Exception("Unknown duals. Please define dual in Pyomo model, i.e., model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT)")
             if hasattr(pyomo_model, 'ipopt_zL_out'):
                 zL_suffix = pyomo_model.ipopt_zL_out
                 full_duals_primals_lb = np.zeros(self._nlp.n_primals())
-                k = 0
-                for _, v in enumerate(pyomo_variables):
+                for i, v in enumerate(pyomo_variables):
                     if v in zL_suffix:
-                        full_duals_primals_lb[k] = zL_suffix[v]
-                        k += 1
+                        full_duals_primals_lb[i] = zL_suffix[v]
             if hasattr(pyomo_model, 'ipopt_zU_out'):
                 zU_suffix = pyomo_model.ipopt_zU_out
                 full_duals_primals_ub = np.zeros(self._nlp.n_primals())
-                k = 0
-                for _, v in enumerate(pyomo_variables):
+                for i, v in enumerate(pyomo_variables):
                     if v in zU_suffix:
-                        full_duals_primals_ub[k] = zU_suffix[v]
-                        k += 1
+                        full_duals_primals_ub[i] = zU_suffix[v]
+
         if full_duals_primals_lb is None or full_duals_primals_ub is None:
             raise Exception("Unknown duals_primals_lb/ub. Please define ipopt_zL_out and ipopt_zU_out in Pyomo model, \
                             i.e., model.ipopt_zL_out = pyo.Suffix(direction=pyo.Suffix.IMPORT) \
@@ -308,6 +309,9 @@ class Sensitivity:
         self.grad_parameters = pyomo_layer.grad_parameters
         self.nlp_full = pyomo_layer.nlp_full
         self.nlp_var = pyomo_layer.nlp_var
+        if pyomo_layer.slacks:
+            self.nlp_var_slack = pyomo_layer.nlp_var_slack
+            self.pyomo_vars_slack = self.nlp_var_slack.get_pyomo_variables()
 
         if mpi4py_available:
             from mpi4py import MPI
@@ -324,19 +328,23 @@ class Sensitivity:
 
         self.pyomo_cons = self.nlp_full.get_pyomo_constraints()
         self.pyomo_vars_full = self.nlp_full.get_pyomo_variables()
+        self.pyomo_vars = self.nlp_var.get_pyomo_variables()
+        
         self.var_names = pyomo_layer.var_names
         self.vars_objs = pyomo_layer.vars_objs 
         self.bounds_relaxation_factor = pyomo_layer.solver.options["bound_relax_factor"]
+        self.var_slack_names = pyomo_layer.var_slack_names 
+        self.vars_objs_slacks = pyomo_layer.vars_objs_slacks
 
         self.is_first_call = True
         self.debug = False
         self.IPsolver = IPOptions()
         self.IPsolver.use_inertia_correction = True
         self.IPsolver.linalg.solver = MumpsInterface(comm=rank_comm)
-        # self.IPsolver.linalg.solver = InteriorPointMA27Interface()
-        # self.IPsolver.linalg.solver = ScipyInterface(compute_inertia=self.IPsolver.use_inertia_correction)
+        #self.IPsolver.linalg.solver = InteriorPointMA27Interface()
+        #self.IPsolver.linalg.solver = ScipyInterface(compute_inertia=self.IPsolver.use_inertia_correction)
 
-    def get_sen(self, concrete_model):
+    def get_sen(self, concrete_model, correction):
         """
         Descriptions: 
             Obtain the sensitivity matrix of decision variables with respect to the parameters.
@@ -380,16 +388,24 @@ class Sensitivity:
         duals = - np.array(duals, dtype = np.float64)
         self.nlp_full.set_duals(duals)
 
-        nlp_vars = ProjectedExtendedNLP(self.nlp_full, self.var_names)
+        if correction:
+            nlp_vars = ProjectedExtendedNLP(self.nlp_full, self.var_slack_names)
+            pyomo_vars = self.pyomo_vars_slack
+        else:
+            nlp_vars = ProjectedExtendedNLP(self.nlp_full, self.var_names)
+            pyomo_vars = self.pyomo_vars
 
-        IPOPT = InteriorPointInterface(concrete_model, nlp_vars, self.nlp_full, self.pyomo_vars_full) 
+        IPOPT = InteriorPointInterface(concrete_model, nlp_vars, self.nlp_full, pyomo_vars) 
         IPOPT.set_bounds_relaxation_factor(self.bounds_relaxation_factor)
         kkt = IPOPT.evaluate_primal_dual_kkt_matrix()
 
         nlp_params = ProjectedExtendedNLP(self.nlp_full, self.param_order)
 
         # Build the right hand side vector
-        Hessian = self.nlp_full.extract_submatrix_hessian_lag(pyomo_variables_rows=self.vars_objs, pyomo_variables_cols = self.grad_parameters)
+        if correction:
+            Hessian = self.nlp_full.extract_submatrix_hessian_lag(pyomo_variables_rows=self.vars_objs_slacks, pyomo_variables_cols = self.grad_parameters)
+        else:
+            Hessian = self.nlp_full.extract_submatrix_hessian_lag(pyomo_variables_rows=self.vars_objs, pyomo_variables_cols = self.grad_parameters)
         H_ineq = nlp_params.evaluate_jacobian_ineq()        
         H_eq = nlp_params.evaluate_jacobian_eq()
         
@@ -401,22 +417,26 @@ class Sensitivity:
 
         if np.any(np.isnan(kkt.tocsc().todense())) or np.any(np.isinf(kkt.tocsc().todense())):
             raise RuntimeError("This is a runtime error")
-        
-        if self.is_first_call:
-            ds, self.IPsolver = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
-                                    is_first_call = self.is_first_call, IPoptions = self.IPsolver)
-            self.is_first_call = False
-        else:   
-            ds, _ = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
+        try:
+            if self.is_first_call:
+                ds, self.IPsolver = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
                                         is_first_call = self.is_first_call, IPoptions = self.IPsolver)
-        # except:
-        #     rhs = -kkt_rhs.toarray()
-        #     ds = np.zeros_like(rhs)
-        dfullvar_dp = ds[:len(self.var_names), :]
-        # ds = spsolve(kkt.tocsc(), -kkt_rhs.tocsc())
-        # dfullvar_dp = np.array(ds.todense())[:len(var_names), :]
+                self.is_first_call = False
+            else:   
+                ds, _ = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
+                                            is_first_call = self.is_first_call, IPoptions = self.IPsolver)
+        except:
+            rhs = -kkt_rhs.toarray()
+            ds = np.zeros_like(rhs)
+            raise RuntimeWarning("zero_grad returned due to failed KKT")
 
+        if correction:
+            dfullvar_dp = ds[:len(self.var_slack_names), :]
+        else:
+            dfullvar_dp = ds[:len(self.var_names), :]
+        # print("dfullvar_dp", dfullvar_dp)
+        # dfullvar_dp = np.array(ds.todense())[:len(var_names), :]
         if self.debug:
-            return dfullvar_dp, kkt.tocsc().todense(), kkt_rhs.tocsc().todense(), duals
+            return dfullvar_dp, kkt.toarray(), kkt_rhs.toarray(), duals
         else:
             return dfullvar_dp, 0, 0, duals
