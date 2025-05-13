@@ -152,7 +152,7 @@ def QP_grad_pyomo(n, t, p, sample_num, batch_size, alg = "pyomo", val_seed=0):
         h_batch = h_batch.detach().clone().requires_grad_(True)
         input = tuple([P_batch, q_batch, A_batch, b_batch, G_batch, h_batch])
         if alg == "pyomo":
-            primal_batch, dual_batch, _, _ = Layer(*input)
+            primal_batch, _, dual_batch, _, _ = Layer(*input)
             duals.append(dual_batch.detach().numpy())
         elif alg == "cvxpy":
             primal_batch, = Layer(*input)
