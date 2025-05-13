@@ -58,7 +58,7 @@ class PyomoOptLayer(nn.Module):
         >>> Layer = PyomoOptLayer(create_model, variables, parameters, free_parameters, known_parameters, solver = 'ipopt')
     """
 
-    def __init__(self, concrete_model, variables, parameters, free_parameters = None, known_parameters = None, ipopt_options = None):
+    def __init__(self, concrete_model, variables, parameters, free_parameters = None, known_parameters = None, slacks = None, ipopt_options = None):
         super().__init__()
         # takes a pyomo model
         self.concrete_model = concrete_model
@@ -77,10 +77,11 @@ class PyomoOptLayer(nn.Module):
         self.parameter = parameters
         self.known_parameters = known_parameters
         self.free_parameters = free_parameters
+        self.slacks = slacks
+        self.obj_weight = None
         self.nlp_var = PyomoNLP(concrete_model)
         self.init_pyomo_varorder()
 
-        
     def get_nlp_full(self, para):
         model = self.concrete_model
         # Unfix the param variables for Jac/Hessian evaluation
@@ -120,23 +121,40 @@ class PyomoOptLayer(nn.Module):
                 self.vars_to_indices[p] = pyo.ComponentMap()
                 for idx, var in enumerate(p.values()):
                     self.vars_to_indices[p][var] = idx
-        
-        self.nlp_full = self.get_nlp_full(para = self.parameter)
+
+        if self.slacks:
+            self.nlp_full = self.get_nlp_full(para = [*self.parameter, *self.slacks])
+            self.nlp_var_slack = self.get_nlp_full(para = [*self.slacks])
+            pyomo_variables_vars_slack = ComponentSet(self.nlp_var_slack.get_pyomo_variables())
+            self.obj_weight = self.concrete_model.obj_weight.value
+        else:
+            self.nlp_full = self.get_nlp_full(para = self.parameter)
+            self.slacks_num = None
+            
         # self.pyomo_cons = self.nlp_full.get_pyomo_constraints()
         pyomo_vars_full = self.nlp_full.get_pyomo_variables()
         pyomo_variables_vars = ComponentSet(self.nlp_var.get_pyomo_variables())
         # Use nlp_var = ProjectedExtendedNLP(nlp_full, var_names) in get_sen() function, make sure the var_order matches nlp_full.pyomo_variables()
         self.var_names = []
         self.vars_objs = [] # nlp.extract_submatrix_hessian_lag(vars_objs) follows nlp_full pyomo_variables order
+        self.var_slack_names = []
+        self.vars_objs_slacks = []
         for var in pyomo_vars_full:
             # actual vars
             if var in pyomo_variables_vars:
                 self.var_names.append(var.name)
                 self.vars_objs.append(var)
-        
+
+            if self.slacks and (var in pyomo_variables_vars_slack):
+                self.var_slack_names.append(var.name)
+                self.vars_objs_slacks.append(var)
+
         var_to_idx = pyo.ComponentMap()
         for idx, var in enumerate(self.vars_objs):
             var_to_idx[var] = idx
+        var_slack_to_idx = pyo.ComponentMap()
+        for idx, var in enumerate(self.vars_objs_slacks):
+            var_slack_to_idx[var] = idx
         # obtain the order difference of nlp_full.get_pyomo_variable and variables given by the user
         self.variables_index_order = []
         for var in self.variables:
@@ -145,7 +163,23 @@ class PyomoOptLayer(nn.Module):
                     self.variables_index_order.append(var_to_idx[v])
             else:
                 self.variables_index_order.append(var_to_idx[var])
-
+        self.variables_slacks_index_order = []
+        self.slacks_index_order = []
+        if self.slacks:
+            for var in self.variables:
+                if var.is_indexed():
+                    for v in var.values():
+                        self.variables_slacks_index_order.append(var_slack_to_idx[v])
+                else:
+                    self.variables_slacks_index_order.append(var_slack_to_idx[var])
+            
+            for var in self.slacks:
+                if var.is_indexed():
+                    for v in var.values():
+                        self.slacks_index_order.append(var_slack_to_idx[v])
+                else:
+                    self.slacks_index_order.append(var_slack_to_idx[var])
+            self.slacks_num = len(self.slacks_index_order)
         self.sensitivity = Sensitivity(self) 
 
     def forward(self, *batch_params):
@@ -179,18 +213,19 @@ class PyomoOptLayer(nn.Module):
             f = PyomoLayerFn(concrete_model = self.concrete_model, variables = self.variables,  \
                             parameters = self.parameter, parameters_size = self.parameters_size, vars_to_indices = self.vars_to_indices, \
                             known_parameters = self.known_parameters, grad_parameters = self.grad_parameters, \
-                            variables_index_order = self.variables_index_order, solver = self.solver, sensitivity = self.sensitivity, train_mode = True)
+                            variables_index_order = self.variables_index_order, variables_slacks_index_order = self.variables_slacks_index_order,  \
+                            slacks_index_order = self.slacks_index_order, slacks_num = self.slacks_num, slacks = self.slacks, obj_weight = self.obj_weight, solver = self.solver, sensitivity = self.sensitivity)
             sol = f(*batch_params)
         else:
             with torch.no_grad(): 
                 f = PyomoLayerFn_eval(concrete_model = self.concrete_model, variables = self.variables,  \
                             parameters = self.parameter, vars_to_indices = self.vars_to_indices, \
-                            known_parameters = self.known_parameters, solver = self.solver, train_mode = False)
+                            known_parameters = self.known_parameters, slacks = self.slacks, obj_weight = self.obj_weight, solver = self.solver)
                 sol = f(*batch_params)
         return sol
         
 def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to_indices, known_parameters, grad_parameters, \
-                 variables_index_order, solver, sensitivity, train_mode):
+                 variables_index_order, variables_slacks_index_order, slacks_index_order, slacks_num, slacks, obj_weight, solver, sensitivity):
     """
     Descriptions: 
         The forward and backward function for the PyomoOptLayer module.
@@ -201,6 +236,11 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             local_primal_out = []
             local_dual_out = []
             local_J = []
+            local_J_slack = []
+            local_slack = []
+            local_lhs_Jac = []
+            local_rhs_Jac = []
+            flag = False
             batch_size = batch_params[0].shape[0]
             # Split batch indices across MPI ranks
             # local_batches = [i for i in range(batch_size) if i % size == rank]  # More balanced distribution 
@@ -209,64 +249,71 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             for batch in local_batches:
                 params = [p[batch] for p in batch_params]  # Get batch parameters
                 # TODO single_solve(concrete_modified_model)
-                vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
+                vars, correction, vars_slack = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params, slacks, obj_weight)
                 # vars = torch.tensor(vars, dtype=batch_params[0].dtype, device=batch_params[0].device).view(-1).requires_grad_(True)
                 # start_time = time.time()
-                dfullvar_dp, lhs_Jac, rhs_Jac, duals = sensitivity.get_sen(concrete_model)
-                grad = dfullvar_dp[variables_index_order, :]
+                dfullvar_dp, lhs_Jac, rhs_Jac, duals = sensitivity.get_sen(concrete_model, correction)
+                # use the updated model for this sample
+                if correction:
+                    grad = dfullvar_dp[variables_slacks_index_order, :]
+                    grad_slack = dfullvar_dp[slacks_index_order, :]
+                    local_J_slack.append(grad_slack)
+                    flag = True
+                # use the original model for this sample, but the grad_slack should be returned just in case other batch samples need slack_grad
+                elif slacks_num is not None:
+                    grad = dfullvar_dp[variables_index_order, :]
+                    grad_slack = np.zeros((slacks_num, grad.shape[1]))
+                    local_J_slack.append(grad_slack)
+                # the user does not want slack mode    
+                else:
+                    grad = dfullvar_dp[variables_index_order, :]
+                # print("grad", grad)
                 local_primal_out.append(vars)
                 local_dual_out.append(duals)
                 local_J.append(grad)
+                local_slack.append(vars_slack)
+                local_lhs_Jac.append(lhs_Jac)
+                local_rhs_Jac.append(rhs_Jac)
 
-            # local_primal_out = torch.stack(local_primal_out) if local_primal_out else torch.empty((0, len(vars)))
-            # local_dual_out = torch.stack(local_dual_out) if local_dual_out else torch.empty((0, len(duals)))
-            # all_primal_out = comm.gather(local_primal_out, root=0)
-            local_primal_out = np.array(local_primal_out)
-            local_dual_out = np.array(local_dual_out)
-            local_J = np.array(local_J)
-            # recvbuf = np.empty(size * local_primal_out.size)
-            # comm.Allgather(local_primal_out, recvbuf)
-            # all_primal_out = recvbuf.reshape(size, local_primal_out.shape[0], local_primal_out.shape[1])
+            all_primal_out = comm.allgather(np.array(local_primal_out))
+            all_dual_out = comm.allgather(np.array(local_dual_out))
+            all_J = comm.allgather(np.array(local_J))
+            all_lhs_Jac = comm.allgather(local_lhs_Jac)
+            all_rhs_Jac = comm.allgather(local_rhs_Jac)
 
-            # recvbuf_dual = np.empty(size * local_dual_out.size)
-            # comm.Allgather(local_dual_out, recvbuf_dual)
-            # all_dual_out = recvbuf_dual.reshape(size, local_dual_out.shape[0], local_dual_out.shape[1])
-            all_primal_out = comm.allgather(local_primal_out)
-            all_dual_out = comm.allgather(local_dual_out)
-            # recvbuf_J = np.empty(size * local_J.size)
-            # comm.Allgather(local_J, recvbuf_J)
-            # all_J = recvbuf_J.reshape(size, local_J.shape[0], local_J.shape[1], local_J.shape[2])
-            all_J = comm.allgather(local_J)
-            # all_dual_out = comm.allgather(local_dual_out)
-            # all_J = comm.allgather(local_J)
-
-            primal_out, dual_out, J, lhs_J, rhs_J = None, None, [], [], []
-
+            slack_out, J_slack = None, None
+            # at least one data sample is corrected
+            if flag:
+                all_J_slack = comm.allgather(np.array(local_J_slack))
+                all_J_slack = [arr for arr in all_J_slack if arr.size > 0]
+                J_slack = torch.from_numpy(np.concatenate(all_J_slack, axis=0)).requires_grad_(False)
+                all_slack = comm.allgather(np.array(local_slack))
+                all_slack = [arr for arr in all_slack if arr.size > 0]
+                slack_out = torch.from_numpy(np.concatenate(all_slack, axis=0)).requires_grad_(True)
             all_primal_out = [arr for arr in all_primal_out if arr.size > 0]
             all_dual_out = [arr for arr in all_dual_out if arr.size > 0]
             all_J = [arr for arr in all_J if arr.size > 0]
 
             primal_out = torch.from_numpy(np.concatenate(all_primal_out, axis=0)).requires_grad_(True)
-            dual_out = torch.from_numpy(np.concatenate(all_dual_out, axis=0)).requires_grad_(True)
+            dual_out = torch.from_numpy(np.concatenate(all_dual_out, axis=0)).requires_grad_(False)
             J = torch.from_numpy(np.concatenate(all_J, axis=0)).requires_grad_(False)
-
-            ctx.save_for_backward(J)
-
-            # J = [item for sublist in all_J for item in sublist]
-            # primal_out = torch.cat([r for r in all_primal_out if r.numel() > 0], dim=0)
-            # dual_out = torch.cat([r for r in all_dual_out if r.numel() > 0], dim=0)
-            # J = [item for sublist in all_J for item in sublist]
-            # primal_out = comm.bcast(primal_out if rank == 0 else None, root=0)
-            # dual_out = comm.bcast(dual_out if rank == 0 else None, root=0)
-            # J = comm.bcast(J if rank == 0 else None, root=0)
-            # ctx.save_for_backward(torch.tensor(np.array(J), dtype=torch.float64))
-            return primal_out, dual_out, lhs_J, rhs_J
+            # print(J)
+            ctx.save_for_backward(J, J_slack)
+            return primal_out, slack_out, dual_out, all_lhs_Jac, all_rhs_Jac
 
         @staticmethod
-        def backward(ctx, grad_out, dual_dummy = 0, Jac_dummy = 0, rhs_dummy = 0):
+        def backward(ctx, grad_out, grad_out_slack, dual_dummy = 0, Jac_dummy = 0, rhs_dummy = 0):
             batch_size = grad_out.shape[0]
-            Jac, = ctx.saved_tensors
+            Jac, Jac_slack = ctx.saved_tensors
             grad = (Jac.transpose(1, 2).bmm(grad_out.unsqueeze(-1))).squeeze(-1)
+            # print(grad)
+            # if Jac_slack is not None:
+            #     grad_slack = Jac_slack.mean(dim=1)
+            #     grad += grad_slack
+            if Jac_slack is not None:
+                grad_slack = (Jac_slack.transpose(1, 2).bmm(grad_out_slack.unsqueeze(-1))).squeeze(-1)
+                grad += grad_slack
+  
             grad_reshape = []
             start = 0
             for _, p in enumerate(parameters):
@@ -284,7 +331,7 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             return *grad_reshape, None
     return PyomoLayerFnFn.apply
 
-def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, train_mode):
+def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, known_parameters, slacks, obj_weight, solver):
     """
     Descriptions: 
         The forward and backward function for the PyomoOptLayer module.
@@ -298,15 +345,23 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
             local_batches = rank_partition(rank, size, batch_size)
             # Each MPI process solves only its assigned batches
             local_results = []
+            local_results_slack = []
             for batch in local_batches:
                 params = [p[batch] for p in batch_params]  # Get batch parameters
-                vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
+                vars, _, vars_slack = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params, slacks, obj_weight)
                 local_results.append(vars)
+                if len(vars_slack) > 0:
+                    local_results_slack.append(vars_slack)
 
-            local_results = np.array(local_results)
-            all_results = comm.allgather(local_results)
+            all_results = comm.allgather(np.array(local_results))
             all_results = [arr for arr in all_results if arr.size > 0]
             primal_out = torch.from_numpy(np.concatenate(all_results, axis=0)).requires_grad_(False)
+
+            slack_out = None
+            if len(vars_slack) > 0:
+                all_results_slack = comm.allgather(np.array(local_results_slack))
+                all_results_slack = [arr for arr in all_results_slack if arr.size > 0]
+                slack_out = torch.from_numpy(np.concatenate(all_results_slack, axis=0)).requires_grad_(False)
 
             # for batch in range(batch_params[0].shape[0]):
             #     params = [p[batch] for p in batch_params]
@@ -316,7 +371,7 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
             #     if batch == 0:
             #         primal_out = torch.zeros((batch_params[0].shape[0], len(vars)))
             #     primal_out[batch] = vars
-            return primal_out, None, None, None
+            return primal_out, slack_out, None, None, None
 
         @staticmethod
         def backward(ctx, grad_out, dual_dummy = 0, Jac_dummy = 0, rhs_dummy = 0):
@@ -332,7 +387,7 @@ def rank_partition(rank, size, batch_size):
     end = start + base + (1 if rank < remainder else 0)
     return list(range(start, end))
 
-def single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params):
+def single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params, slacks, obj_weight):
     # solve over minibatch by just iterating
     with torch.no_grad():
         params_ = [p.detach().clone().double().numpy() for p in params]
@@ -349,11 +404,31 @@ def single_solve(concrete_model, variables, parameters, vars_to_indices, known_p
                 params_flat = params_[end_ + index].reshape(-1)
                 for idx, p_idx in enumerate(p_name.keys()):
                     p_name[p_idx] = params_flat[idx] 
-                
+        # Original model
+        correction = False
+        if slacks is not None:
+            for slack in slacks:
+                slack.fix(0.0)
+            concrete_model.obj_weight = obj_weight    
         result = solver.solve(concrete_model, tee=False)
         if not pyo.check_optimal_termination(result):
-            raise RuntimeError("IPOPT failed to converge!")
+            if slacks is not None:
+                for slack in slacks:
+                    slack.unfix() 
+                correction = True
+                # TODO feasibility
+                concrete_model.obj_weight = 0  
+                result = solver.solve(concrete_model, tee=False)
+            else:
+                raise RuntimeWarning("IPOPT failed to converge! Please consider the slack model")
+        # else:
+        #     print("normal")
         vars = []
         for var in variables:
             vars += [var[i].value for i in var]
-    return vars
+        vars_slack = []
+        if slacks is not None:
+            for var in slacks:
+                vars_slack += [var[i].value for i in var]
+    return vars, correction, vars_slack
+
