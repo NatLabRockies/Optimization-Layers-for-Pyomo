@@ -373,7 +373,7 @@ class Sensitivity:
         """
         # Unfix the param variables for Jac/Hessian evaluation
         for param in concrete_model.component_objects(pyo.Var):
-            if param in self.grad_parameters:
+            if any(param is v for v in self.grad_parameters):
                 for index in param:
                     param[index].unfix() 
 

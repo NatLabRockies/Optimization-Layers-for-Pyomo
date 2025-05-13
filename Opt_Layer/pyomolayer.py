@@ -86,13 +86,13 @@ class PyomoOptLayer(nn.Module):
         model = self.concrete_model
         # Unfix the param variables for Jac/Hessian evaluation
         for param in model.component_objects(pyo.Var):
-            if param in para:
+            if any(param is v for v in para):
                 for index in param:
                     param[index].unfix() 
         nlp_full = PyomoNLP(model)
         # Fix the param variables
         for param in model.component_objects(pyo.Var):
-            if param in para:
+            if any(param is v for v in para):
                 for index in param:
                     param[index].fix()
         return nlp_full
@@ -108,7 +108,7 @@ class PyomoOptLayer(nn.Module):
         for var in self.concrete_model.component_objects(pyo.Var, active=True):
             # Scaler
             if not var.is_indexed():
-                self.parameters_size[var.name] = [0]
+                self.parameters_size[var.name] = [1]
             else: 
                 index_set = var.index_set()
                 self.parameters_size[var.name] = [len(s) for s in index_set.subsets()]
@@ -116,7 +116,8 @@ class PyomoOptLayer(nn.Module):
         self.vars_to_indices = {}
         for p in self.parameter:
             if not p.is_indexed():
-                self.vars_to_indices[p.name] = 0
+                pass
+                # self.vars_to_indices[p.name] = -1
             else:
                 self.vars_to_indices[p] = pyo.ComponentMap()
                 for idx, var in enumerate(p.values()):
@@ -394,7 +395,7 @@ def single_solve(concrete_model, variables, parameters, vars_to_indices, known_p
         for index, p_name in enumerate(parameters):
             params_flat = params_[index].reshape(-1)
             if not p_name.is_indexed():
-                p_name.fix(params_flat)
+                p_name.fix(params_flat.item())
             else:
                 for var, idx in vars_to_indices[p_name].items():
                     var.fix(params_flat[idx])
