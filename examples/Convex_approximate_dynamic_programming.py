@@ -52,7 +52,7 @@ import matplotlib.pyplot as plt
 from Opt_Layer.algorithms import fit
 from scipy.linalg import solve_discrete_are
 from scipy.linalg import sqrtm
-
+import time
 # %%
 def create_model(nominal_q, nominal_P21, nominal_Psqrt, nominal_x):
     # Create a concrete model
@@ -120,7 +120,7 @@ def main():
         cost = 0.
         for _ in range(T):
             input = tuple([q.unsqueeze(0), P_21.unsqueeze(0), P_sqrt.unsqueeze(0), x.unsqueeze(0)])
-            primal, _, _, _= Pyomolayer(*input)
+            primal, _, _, _, _= Pyomolayer(*input)
             u = primal.T
             cost += g(x, u) / T
             x = A_tch @ x + B_tch @ u + .2 * torch.randn(n, 1).double()
@@ -135,7 +135,7 @@ def main():
     global m, n
     n = 2
     m = 3
-    iters=100
+    iters=10
 
     A = np.eye(n) + 1e-2 * np.random.randn(n, n)
     B = 1e-2 / 3 * np.random.randn(n, m)
@@ -180,8 +180,10 @@ def main():
     plt.savefig(os.path.join(results_dir, "loss_CADP.png"), dpi=300, bbox_inches='tight')
     plt.close()
 if __name__ == "__main__":
+    start = time.time()
     main()
-
+    train_time = time.time() - start
+    print(train_time)
 
 
 
