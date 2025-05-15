@@ -341,7 +341,7 @@ class Sensitivity:
         self.IPsolver = IPOptions()
         self.IPsolver.use_inertia_correction = True
         self.IPsolver.linalg.solver = MumpsInterface(comm=rank_comm)
-        #self.IPsolver.linalg.solver = InteriorPointMA27Interface()
+        # self.IPsolver.linalg.solver = InteriorPointMA27Interface()
         #self.IPsolver.linalg.solver = ScipyInterface(compute_inertia=self.IPsolver.use_inertia_correction)
 
     def get_sen(self, concrete_model, correction):
@@ -381,13 +381,11 @@ class Sensitivity:
         for var in self.pyomo_vars_full:
             primals.append(var.value)
         self.nlp_full.set_primals(np.array(primals))
-
         duals = []
         for constraint in self.pyomo_cons:
             duals.append(concrete_model.dual[constraint])
         duals = - np.array(duals, dtype = np.float64)
         self.nlp_full.set_duals(duals)
-
         if correction:
             nlp_vars = ProjectedExtendedNLP(self.nlp_full, self.var_slack_names)
             pyomo_vars = self.pyomo_vars_slack
@@ -414,8 +412,7 @@ class Sensitivity:
         kkt_rhs.set_block(1, 0, coo_matrix((self.nlp_full.n_ineq_constraints(), Hessian.shape[1])))
         kkt_rhs.set_block(2, 0, H_eq)
         kkt_rhs.set_block(3, 0, H_ineq)
-
-        if np.any(np.isnan(kkt.tocsc().todense())) or np.any(np.isinf(kkt.tocsc().todense())):
+        if np.any(np.isnan(kkt.tocsc().data)) or np.any(np.isinf(kkt.tocsc().data)):
             raise RuntimeError("This is a runtime error")
         try:
             if self.is_first_call:
