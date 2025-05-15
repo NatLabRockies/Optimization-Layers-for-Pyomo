@@ -117,7 +117,7 @@ class PyomoOptLayer(nn.Module):
         for p in self.parameter:
             if not p.is_indexed():
                 pass
-                # self.vars_to_indices[p.name] = -1
+                # self.vars_to_indices[p.name] = 0
             else:
                 self.vars_to_indices[p] = pyo.ComponentMap()
                 for idx, var in enumerate(p.values()):
@@ -153,6 +153,7 @@ class PyomoOptLayer(nn.Module):
         var_to_idx = pyo.ComponentMap()
         for idx, var in enumerate(self.vars_objs):
             var_to_idx[var] = idx
+
         var_slack_to_idx = pyo.ComponentMap()
         for idx, var in enumerate(self.vars_objs_slacks):
             var_slack_to_idx[var] = idx
@@ -298,7 +299,6 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             primal_out = torch.from_numpy(np.concatenate(all_primal_out, axis=0)).requires_grad_(True)
             dual_out = torch.from_numpy(np.concatenate(all_dual_out, axis=0)).requires_grad_(False)
             J = torch.from_numpy(np.concatenate(all_J, axis=0)).requires_grad_(False)
-            # print(J)
             ctx.save_for_backward(J, J_slack)
             return primal_out, slack_out, dual_out, all_lhs_Jac, all_rhs_Jac
 
@@ -410,8 +410,9 @@ def single_solve(concrete_model, variables, parameters, vars_to_indices, known_p
         if slacks is not None:
             for slack in slacks:
                 slack.fix(0.0)
-            concrete_model.obj_weight = obj_weight    
+            concrete_model.obj_weight = obj_weight   
         result = solver.solve(concrete_model, tee=False)
+        
         if not pyo.check_optimal_termination(result):
             if slacks is not None:
                 for slack in slacks:
