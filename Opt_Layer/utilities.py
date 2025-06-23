@@ -425,7 +425,7 @@ class Sensitivity:
         except:
             rhs = -kkt_rhs.toarray()
             ds = np.zeros_like(rhs)
-            raise RuntimeWarning("zero_grad returned due to failed KKT")
+            print("zero_grad returned due to failed KKT")
 
         if correction:
             dfullvar_dp = ds[:len(self.var_slack_names), :]

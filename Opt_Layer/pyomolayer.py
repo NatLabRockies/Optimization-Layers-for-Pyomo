@@ -253,7 +253,6 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
                 # TODO single_solve(concrete_modified_model)
                 vars, correction, vars_slack = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params, slacks, obj_weight)
                 # vars = torch.tensor(vars, dtype=batch_params[0].dtype, device=batch_params[0].device).view(-1).requires_grad_(True)
-                # start_time = time.time()
                 dfullvar_dp, lhs_Jac, rhs_Jac, duals = sensitivity.get_sen(concrete_model, correction)
                 # use the updated model for this sample
                 if correction:
@@ -276,10 +275,9 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
                 local_slack.append(vars_slack)
                 local_lhs_Jac.append(lhs_Jac)
                 local_rhs_Jac.append(rhs_Jac)
-
             all_primal_out = comm.allgather(np.array(local_primal_out))
             all_dual_out = comm.allgather(np.array(local_dual_out))
-            all_J = comm.allgather(np.array(local_J))
+            all_J = comm.allgather(np.array(local_J, dtype=np.float32))
             all_lhs_Jac = comm.allgather(local_lhs_Jac)
             all_rhs_Jac = comm.allgather(local_rhs_Jac)
 
@@ -300,12 +298,13 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             dual_out = torch.from_numpy(np.concatenate(all_dual_out, axis=0)).requires_grad_(False)
             J = torch.from_numpy(np.concatenate(all_J, axis=0)).requires_grad_(False)
             ctx.save_for_backward(J, J_slack)
-            return primal_out, slack_out, dual_out, all_lhs_Jac, all_rhs_Jac
+            return primal_out, slack_out, dual_out, all_lhs_Jac, all_rhs_Jac, J
 
         @staticmethod
-        def backward(ctx, grad_out, grad_out_slack, dual_dummy = 0, Jac_dummy = 0, rhs_dummy = 0):
+        def backward(ctx, grad_out, grad_out_slack, dual_dummy = 0, Jac_dummy = 0, rhs_dummy = 0, J_dummy = 0):
             batch_size = grad_out.shape[0]
             Jac, Jac_slack = ctx.saved_tensors
+            Jac = Jac.to(dtype=grad_out.dtype)
             grad = (Jac.transpose(1, 2).bmm(grad_out.unsqueeze(-1))).squeeze(-1)
             # print(grad)
             # if Jac_slack is not None:
@@ -372,7 +371,7 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
             #     if batch == 0:
             #         primal_out = torch.zeros((batch_params[0].shape[0], len(vars)))
             #     primal_out[batch] = vars
-            return primal_out, slack_out, None, None, None
+            return primal_out, slack_out, None, None, None, None
 
         @staticmethod
         def backward(ctx, grad_out, dual_dummy = 0, Jac_dummy = 0, rhs_dummy = 0):
@@ -405,7 +404,7 @@ def single_solve(concrete_model, variables, parameters, vars_to_indices, known_p
                 params_flat = params_[end_ + index].reshape(-1)
                 for idx, p_idx in enumerate(p_name.keys()):
                     p_name[p_idx] = params_flat[idx] 
-        # Original model
+    
         correction = False
         if slacks is not None:
             for slack in slacks:
@@ -414,6 +413,7 @@ def single_solve(concrete_model, variables, parameters, vars_to_indices, known_p
         result = solver.solve(concrete_model, tee=False)
         
         if not pyo.check_optimal_termination(result):
+            # print("slack model")
             if slacks is not None:
                 for slack in slacks:
                     slack.unfix() 
@@ -422,7 +422,8 @@ def single_solve(concrete_model, variables, parameters, vars_to_indices, known_p
                 concrete_model.obj_weight = 0  
                 result = solver.solve(concrete_model, tee=False)
             else:
-                raise RuntimeWarning("IPOPT failed to converge! Please consider the slack model")
+                print("IPOPT failed to converge! Please consider the slack model")
+                # raise RuntimeWarning("IPOPT failed to converge! Please consider the slack model")
         # else:
         #     print("normal")
         vars = []
