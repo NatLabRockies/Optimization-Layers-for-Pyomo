@@ -183,3 +183,4 @@ examples/Notebook/monotonic_output_regression.ipynb
 examples/Notebook/ReLU Layers.ipynb
 examples/Notebook/signal_denoising.ipynb
 examples/Notebook/OPF
+tests/results
