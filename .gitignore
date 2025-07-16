@@ -174,3 +174,12 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+Opt_Layer/pyomolayer_pcopy.py
+examples/Notebook/Constrained MPC.ipynb
+examples/Notebook/Convex approximate dynamic programming.ipynb
+examples/Notebook/General Polytope Projections.ipynb
+examples/Notebook/monotonic_output_regression.ipynb
+examples/Notebook/ReLU Layers.ipynb
+examples/Notebook/signal_denoising.ipynb
+examples/Notebook/OPF

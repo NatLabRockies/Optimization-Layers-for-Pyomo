@@ -275,12 +275,19 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
                 local_slack.append(vars_slack)
                 local_lhs_Jac.append(lhs_Jac)
                 local_rhs_Jac.append(rhs_Jac)
-            all_primal_out = comm.allgather(np.array(local_primal_out))
-            all_dual_out = comm.allgather(np.array(local_dual_out))
-            all_J = comm.allgather(np.array(local_J, dtype=np.float32))
-            all_lhs_Jac = comm.allgather(local_lhs_Jac)
-            all_rhs_Jac = comm.allgather(local_rhs_Jac)
+            
+            if size == 1:
+                all_primal_out = [np.array(local_primal_out, dtype=np.float32) for _ in range(size)]
+                all_dual_out = [np.array(local_dual_out, dtype=np.float32) for _ in range(size)]
+                all_J = [np.array(local_J, dtype=np.float32) for _ in range(size)]
+            else:
+                all_primal_out = comm.allgather(np.array(local_primal_out, dtype=np.float32))
+                all_dual_out = comm.allgather(np.array(local_dual_out, dtype=np.float32))
+                all_J = comm.allgather(np.array(local_J, dtype=np.float32))
 
+            # all_lhs_Jac = comm.allgather(local_lhs_Jac)
+            # all_rhs_Jac = comm.allgather(local_rhs_Jac)
+            all_lhs_Jac, all_rhs_Jac = None, None
             slack_out, J_slack = None, None
             # at least one data sample is corrected
             if flag:

@@ -781,18 +781,7 @@ def create_model(nominal_pg, nominal_vg, nominal_pd, nominal_qd):
     model.vm = pyo.Var(model.load_buses, within=pyo.PositiveReals, initialize = 1.0) 
     model.va = pyo.Var(model.nonslack_idxes, within=pyo.Reals, initialize = 0.0)  # Voltage angles at all buses except for the slack bus
     model.pg_ref = pyo.Var(model.slack_bus, within=pyo.Reals)  
-    # model.slackvar = pyo.Var(model.slack_bus, domain=pyo.NonNegativeReals)
-    model.qg = pyo.Var(model.gen_slack_buses, within=pyo.Reals)
-    # model.slack_qvar = pyo.Var(model.gen_buses, within=pyo.NonNegativeReals)
-    # model.slack_qvar_l = pyo.Var(model.gen_buses, within=pyo.NonNegativeReals)
-    # def positivity_constraint(model, i):
-    #     return model.pg_ref[i] + model.slackvar[i] == 0
-    # def qg_ubound_constraint(model, i):
-    #     return model.qg[i] + model.slack_qvar[i] == qg_bound[spv_index[i]][0] 
-    # def qg_lbound_constraint(model, i):
-    #     return model.qg[i] == model.slack_qvar_l[i] + qg_bound[spv_index[i]][1] 
-    # model.pg_ref = pyo.Var(model.slack_bus, within=pyo.NonNegativeReals, bounds = lambda model, i: tuple(pg_bound[spv_index[i]]))            
-    # model.qg = pyo.Var(model.gen_slack_buses, within=pyo.Reals, bounds = lambda model, i: tuple(qg_bound[spv_index[i]]))            
+    model.qg = pyo.Var(model.gen_slack_buses, within=pyo.Reals)          
 
     for i, bus in enumerate(model.gen_slack_buses):
         model.vg[bus].fix(nominal_vg[i])
@@ -860,11 +849,11 @@ results = opt.solve(model, tee=True)
 # model.display()
 # print(model.obj())
 
-variables_name = [model.vm, model.va, model.pg_ref, model.qg]
-#variables_name = [model.vm, model.va]
+variables_name = [model.vm, model.pg_ref, model.qg]
 parameters_name = [model.pg, model.vg]
 parameters_known = [model.pd, model.qd]
 free_parameters_name = None
+slacks = None
 Layer = PyomoOptLayer(model, variables_name, parameters_name, free_parameters_name, parameters_known)
 
 trainX_new = data.trainX
@@ -949,7 +938,7 @@ epoch_loss_unsuper = []
 
 if __name__ == "__main__":
     start_time1 = time.time()
-    for i in range(5):
+    for i in range(50):
         epoch_stats = {}
         # Get train loss
         solver_net.train()
@@ -972,19 +961,19 @@ if __name__ == "__main__":
                 input = tuple([Yhat_train_partial_trans[:, :data.npv], Yhat_train_partial_trans[:, data.npv:], \
                         Xtrain[:, :data.nbus], Xtrain[:, data.nbus:]])
 
-                primal_batch, _, _, _ = Layer(*input)
+                primal_batch, _, _, _, _ = Layer(*input)
                 Yhat_train = torch.zeros(Xtrain.shape[0], data.ydim)
                 Yhat_train[:, data.pv_] = Yhat_train_partial_trans[:, :data.npv]
-                #pg_ref
-                Yhat_train[:, data.slack_] = primal_batch[:, len(data.pq) + len(data.nonslack_idxes):len(data.pq) + len(data.nonslack_idxes)+1]
-                #qg
-                Yhat_train[:, data.ng:data.ng*2] = primal_batch[:, len(data.pq) + len(data.nonslack_idxes)+1:len(data.pq) + len(data.nonslack_idxes) + 1 + data.ng]
+                # pg_ref
+                Yhat_train[:, data.slack_] = primal_batch[:, len(data.pq):len(data.pq) +1]
+                # qg
+                Yhat_train[:, data.ng:data.ng*2] = primal_batch[:, len(data.pq) + 1:len(data.pq) + 1 + data.ng]
                 # vm 
                 Yhat_train[:, data.ng*2+data.pq] = primal_batch[:, :len(data.pq)]
                 #Yhat_train[:, data.ng*2+data.spv] = primal_batch[:, len(data.pq) + len(data.nonslack_idxes) + 1 + data.ng:]
                 Yhat_train[:, data.ng*2+data.spv] = Yhat_train_partial_trans[:, data.npv:]
                 # va
-                Yhat_train[:, data.ng*2+data.nbus+data.nonslack_idxes] = primal_batch[:, len(data.pq):len(data.pq) + len(data.nonslack_idxes)]
+                # Yhat_train[:, data.ng*2+data.nbus+data.nonslack_idxes] = primal_batch[:, len(data.pq):len(data.pq) + len(data.nonslack_idxes)]
                 Yhat_train[:, data.ng*2+data.nbus+data.slack.item()] = slackva.item()
                 # calculate the branch flow
                 obj_cost = data.obj_fn(Yhat_train).mean()
@@ -999,7 +988,7 @@ if __name__ == "__main__":
 
             batch_loss.append(train_loss.detach().cpu().numpy())
 
-            # batch_loss_unsuper.append(unsupervised_loss.detach().cpu().numpy())
+            batch_loss_unsuper.append(unsupervised_loss.detach().cpu().numpy())
  
         scheduler.step()
         # Get valid loss
@@ -1011,24 +1000,24 @@ if __name__ == "__main__":
                 
                 Yhat_valid_partial = solver_net(Xvalid).detach()
                 Yhat_valid_partial_trans = data.complete_partial_tanh(Xvalid, Yhat_valid_partial)
-                # Yhat_valid = PFFunction_eval(data)(Xvalid, Yhat_valid_partial_trans)
-                input = tuple([Yhat_valid_partial_trans[:, :data.npv], Yhat_valid_partial_trans[:, data.npv:], \
-                        Xvalid[:, :data.nbus], Xvalid[:, data.nbus:]])
-                primal_batch, _, _, _ = Layer(*input)
+                Yhat_valid = PFFunction_eval(data)(Xvalid, Yhat_valid_partial_trans)
+                # input = tuple([Yhat_valid_partial_trans[:, :data.npv], Yhat_valid_partial_trans[:, data.npv:], \
+                #         Xvalid[:, :data.nbus], Xvalid[:, data.nbus:]])
+                # primal_batch, _, _, _ = Layer(*input)
 
-                Yhat_valid = torch.zeros(Xvalid.shape[0], data.ydim)
-                Yhat_valid[:, data.pv_] = Yhat_valid_partial_trans[:, :data.npv]
-                #pg_ref
-                Yhat_valid[:, data.slack_] = primal_batch[:, len(data.pq) + len(data.nonslack_idxes):len(data.pq) + len(data.nonslack_idxes)+1]
-                #qg
-                Yhat_valid[:, data.ng:data.ng*2] = primal_batch[:, len(data.pq) + len(data.nonslack_idxes)+1:len(data.pq) + len(data.nonslack_idxes) + 1 + data.ng]
-                # vm 
-                Yhat_valid[:, data.ng*2+data.pq] = primal_batch[:, :len(data.pq)]
-                #Yhat_train[:, data.ng*2+data.spv] = primal_batch[:, len(data.pq) + len(data.nonslack_idxes) + 1 + data.ng:]
-                Yhat_valid[:, data.ng*2+data.spv] = Yhat_valid_partial_trans[:, data.npv:]
-                # va
-                Yhat_valid[:, data.ng*2+data.nbus+data.nonslack_idxes] = primal_batch[:, len(data.pq):len(data.pq) + len(data.nonslack_idxes)]
-                Yhat_valid[:, data.ng*2+data.nbus+data.slack.item()] = slackva.item()
+                # Yhat_valid = torch.zeros(Xvalid.shape[0], data.ydim)
+                # Yhat_valid[:, data.pv_] = Yhat_valid_partial_trans[:, :data.npv]
+                # # pg_ref
+                # Yhat_valid[:, data.slack_] = primal_batch[:, len(data.pq):len(data.pq) +1]
+                # # qg
+                # Yhat_valid[:, data.ng:data.ng*2] = primal_batch[:, len(data.pq) + 1:len(data.pq) + 1 + data.ng]
+                # # vm 
+                # Yhat_valid[:, data.ng*2+data.pq] = primal_batch[:, :len(data.pq)]
+                # # Yhat_train[:, data.ng*2+data.spv] = primal_batch[:, len(data.pq) + len(data.nonslack_idxes) + 1 + data.ng:]
+                # Yhat_valid[:, data.ng*2+data.spv] = Yhat_valid_partial_trans[:, data.npv:]
+                # # va
+                # # Yhat_valid[:, data.ng*2+data.nbus+data.nonslack_idxes] = primal_batch[:, len(data.pq):len(data.pq) + len(data.nonslack_idxes)]
+                # Yhat_valid[:, data.ng*2+data.nbus+data.slack.item()] = slackva.item()
 
             eval_net(data, Xvalid, Yhat_valid, args, 'valid', epoch_stats)
         eval_time = time.time() - start_time_eval  
@@ -1038,10 +1027,10 @@ if __name__ == "__main__":
                 np.mean(epoch_stats['valid_ineq_mean']), np.mean(epoch_stats['valid_ineq_num_viol_0'])))
         
         epoch_loss.append(np.mean(batch_loss))
-        # epoch_loss_unsuper.append(np.mean(batch_loss_unsuper))
+        epoch_loss_unsuper.append(np.mean(batch_loss_unsuper))
         
         batch_loss = []
-        # batch_loss_unsuper = []
+        batch_loss_unsuper = []
     #     savepath = os.path.join('data/super/DC3/3Layers/hidden_dim50/obj01_LR0005.pth')
     #    torch.save(solver_net.state_dict(), savepath)    
     train_time = time.time() - start_time1

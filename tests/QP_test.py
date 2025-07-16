@@ -254,9 +254,7 @@ def grad_diff(n: int = 10, t: int = 5, p: int = 2, sample_num: int = 32, batch_s
     np.save(os.path.join(results_dir, "QP_hvalG.npy"), hvalG)
     np.save(os.path.join(results_dir, "QP_primal.npy"), primal)
     np.save(os.path.join(results_dir, "QP_dual.npy"), duals)
-    print("pyomo_time", pyomo_time)
     PsqrtG_ref, qvalG_ref, AvalG_ref, bvalG_ref, GvalG_ref, hvalG_ref, cvxpy_time, primal_ref, _ = QP_grad_pyomo(n, t, p, sample_num, batch_size, alg = "cvxpy", val_seed=val_seed)
-    print("cvxpy_time", cvxpy_time)
     duals_ref = get_duals(n, t, p, sample_num, val_seed)
     if partial:
         inputs = [(primal, primal_ref), (duals, duals_ref), (PsqrtG, PsqrtG_ref), (qvalG, qvalG_ref), (AvalG, AvalG_ref), (bvalG, bvalG_ref), (hvalG, hvalG_ref)]
@@ -283,6 +281,7 @@ def test_grad():
         G_diff = np.stack((PsqrtG_diff, qvalG_diff, AvalG_diff, bvalG_diff, hvalG_diff), axis=1)
     else:
         G_diff = np.stack((PsqrtG_diff, qvalG_diff, AvalG_diff, bvalG_diff, GvalG_diff, hvalG_diff), axis=1)
+
     success_rate_grad = np.mean(np.all(G_diff < grad_diff_threshold, axis=1))
     dual_grad_correct = np.sum((dual_diff < primal_diff_threshold) & np.all(G_diff < grad_diff_threshold, axis=1)) / np.sum(dual_diff < primal_diff_threshold) 
     print("!!!success_rate_primal!!!", success_rate_primal)
@@ -295,6 +294,7 @@ def test_grad():
 if __name__ == "__main__":
     global partial
     partial = False
+
     if len(sys.argv) > 1 and sys.argv[1]:
         write_results(n=10, t=4, p=2, sample_num=1000, batch_size=32, alg="pyomo", val_seed=0)
     else:
