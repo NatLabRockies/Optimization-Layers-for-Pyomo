@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from mpi4py import MPI
+# from mpi4py import MPI
 import copy
 import torch.nn as nn
 import sys
@@ -15,11 +15,13 @@ import logging
 logging.getLogger('pyomo.core').setLevel(logging.ERROR)
 import time
 
-comm = MPI.COMM_WORLD  # Initialize MPI
-rank = comm.Get_rank()  # Process ID
-size = comm.Get_size()  # Total MPI processes
+# comm = MPI.COMM_WORLD  # Initialize MPI
+# rank = comm.Get_rank()  # Process ID
+# size = comm.Get_size()  # Total MPI processes
 
-print(f"Process {rank}/{size}: MPI initialized", flush=True)
+# print(f"Process {rank}/{size}: MPI initialized", flush=True)
+size = 1
+rank = 0
 
 class PyomoOptLayer(nn.Module):
     """
@@ -222,13 +224,13 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
                 local_J.append(grad)
             
             if size == 1:
-                all_primal_out = [np.array(local_primal_out, dtype=np.float32) for _ in range(size)]
-                all_dual_out = [np.array(local_dual_out, dtype=np.float32) for _ in range(size)]
-                all_J = [np.array(local_J, dtype=np.float32) for _ in range(size)]
+                all_primal_out = [np.array(local_primal_out) for _ in range(size)]
+                all_dual_out = [np.array(local_dual_out) for _ in range(size)]
+                all_J = [np.array(local_J) for _ in range(size)]
             else:
-                all_primal_out = comm.allgather(np.array(local_primal_out, dtype=np.float32))
-                all_dual_out = comm.allgather(np.array(local_dual_out, dtype=np.float32))
-                all_J = comm.allgather(np.array(local_J, dtype=np.float32))
+                all_primal_out = comm.allgather(np.array(local_primal_out))
+                all_dual_out = comm.allgather(np.array(local_dual_out))
+                all_J = comm.allgather(np.array(local_J))
             
             all_primal_out = [arr for arr in all_primal_out if arr.size > 0]
             all_dual_out = [arr for arr in all_dual_out if arr.size > 0]

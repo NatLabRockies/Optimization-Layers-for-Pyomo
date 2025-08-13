@@ -347,24 +347,11 @@ class Sensitivity:
         Args:
             - concrete_model (``Pyomo model``, required)
                 The concrete instance has been solved by IPOPT, and the optimal values of primal and dual variables have been obtained.
-            - grad_parameters(``List[str]``, required)
-                A list of parameter name defined in Pyomo.
-            - variables_name_index(``List[str]``, required)
-                A list of indexed variable names
         Returns:
             The sensitivity matrix, left hand side of KKT matrix, right hand side of vector, and the order of variables
         
         Return type:
             Matrix.
-        
-        Examples:
-            >>> concrete_model = pyo.ConcreteModel()
-            >>> solver.solve(concrete_model, tee=False)
-            >>> grad_parameters = ["Psqrt", "q", "A", "b"]
-            >>> variables_name_index = ["x[0]", "x[1]", "x[3]", "y"]
-            >>> param_order = ["Psqrt[0, 0]",... "q[0]"..., "A[0, 0]"..., "b[0]"...]
-            >>> vars_objs = [x, y] based on nlp.get_pyomo_variables()
-            >>> dvar_dp, lhs_Jac, rhs_Jac, variables_index_order = get_sen(concrete_model, grad_parameters, variables_name_index)
         """
         # Unfix the param variables for Jac/Hessian evaluation
         for param in concrete_model.component_objects(pyo.Var):
