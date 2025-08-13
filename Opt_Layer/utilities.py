@@ -16,7 +16,7 @@ from pyomo.contrib.pynumero.sparse import BlockMatrix, BlockVector
 from pyomo.common.timing import HierarchicalTimer
 torch.set_default_dtype(torch.float64)
 from pyomo.common.dependencies import attempt_import
-
+import time
 mpi4py, mpi4py_available = attempt_import("mpi4py", error_message="mpi4py is not available")
 
 class InteriorPointInterface:
@@ -309,9 +309,6 @@ class Sensitivity:
         self.grad_parameters = pyomo_layer.grad_parameters
         self.nlp_full = pyomo_layer.nlp_full
         self.nlp_var = pyomo_layer.nlp_var
-        if pyomo_layer.slacks:
-            self.nlp_var_slack = pyomo_layer.nlp_var_slack
-            self.pyomo_vars_slack = self.nlp_var_slack.get_pyomo_variables()
 
         if mpi4py_available:
             from mpi4py import MPI
@@ -333,18 +330,16 @@ class Sensitivity:
         self.var_names = pyomo_layer.var_names
         self.vars_objs = pyomo_layer.vars_objs 
         self.bounds_relaxation_factor = pyomo_layer.solver.options["bound_relax_factor"]
-        self.var_slack_names = pyomo_layer.var_slack_names 
-        self.vars_objs_slacks = pyomo_layer.vars_objs_slacks
 
         self.is_first_call = True
-        self.debug = False
+        self.debug = True
         self.IPsolver = IPOptions()
         self.IPsolver.use_inertia_correction = True
         self.IPsolver.linalg.solver = MumpsInterface(comm=rank_comm)
         # self.IPsolver.linalg.solver = InteriorPointMA27Interface()
         # self.IPsolver.linalg.solver = ScipyInterface(compute_inertia=self.IPsolver.use_inertia_correction)
 
-    def get_sen(self, concrete_model, correction):
+    def get_sen(self, concrete_model):
         """
         Descriptions: 
             Obtain the sensitivity matrix of decision variables with respect to the parameters.
@@ -386,12 +381,9 @@ class Sensitivity:
             duals.append(concrete_model.dual[constraint])
         duals = - np.array(duals, dtype = np.float64)
         self.nlp_full.set_duals(duals)
-        if correction:
-            nlp_vars = ProjectedExtendedNLP(self.nlp_full, self.var_slack_names)
-            pyomo_vars = self.pyomo_vars_slack
-        else:
-            nlp_vars = ProjectedExtendedNLP(self.nlp_full, self.var_names)
-            pyomo_vars = self.pyomo_vars
+
+        nlp_vars = ProjectedExtendedNLP(self.nlp_full, self.var_names)
+        pyomo_vars = self.pyomo_vars
 
         IPOPT = InteriorPointInterface(concrete_model, nlp_vars, self.nlp_full, pyomo_vars) 
         IPOPT.set_bounds_relaxation_factor(self.bounds_relaxation_factor)
@@ -400,10 +392,7 @@ class Sensitivity:
         nlp_params = ProjectedExtendedNLP(self.nlp_full, self.param_order)
 
         # Build the right hand side vector
-        if correction:
-            Hessian = self.nlp_full.extract_submatrix_hessian_lag(pyomo_variables_rows=self.vars_objs_slacks, pyomo_variables_cols = self.grad_parameters)
-        else:
-            Hessian = self.nlp_full.extract_submatrix_hessian_lag(pyomo_variables_rows=self.vars_objs, pyomo_variables_cols = self.grad_parameters)
+        Hessian = self.nlp_full.extract_submatrix_hessian_lag(pyomo_variables_rows=self.vars_objs, pyomo_variables_cols = self.grad_parameters)
         H_ineq = nlp_params.evaluate_jacobian_ineq()        
         H_eq = nlp_params.evaluate_jacobian_eq()
         
@@ -425,14 +414,9 @@ class Sensitivity:
         except:
             rhs = -kkt_rhs.toarray()
             ds = np.zeros_like(rhs)
-            print("zero_grad returned due to failed KKT")
+            raise RuntimeWarning("zero_grad returned due to failed KKT")
+        dfullvar_dp = ds[:len(self.var_names), :]
 
-        if correction:
-            dfullvar_dp = ds[:len(self.var_slack_names), :]
-        else:
-            dfullvar_dp = ds[:len(self.var_names), :]
-        # print("dfullvar_dp", dfullvar_dp)
-        # dfullvar_dp = np.array(ds.todense())[:len(var_names), :]
         if self.debug:
             return dfullvar_dp, kkt.toarray(), kkt_rhs.toarray(), duals
         else:

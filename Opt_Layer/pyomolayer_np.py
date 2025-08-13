@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from mpi4py import MPI
 import copy
 import torch.nn as nn
 import sys
@@ -13,13 +12,6 @@ from Opt_Layer.utilities import Sensitivity
 torch.set_default_dtype(torch.float64)
 import logging
 logging.getLogger('pyomo.core').setLevel(logging.ERROR)
-import time
-
-comm = MPI.COMM_WORLD  # Initialize MPI
-rank = comm.Get_rank()  # Process ID
-size = comm.Get_size()  # Total MPI processes
-
-print(f"Process {rank}/{size}: MPI initialized", flush=True)
 
 class PyomoOptLayer(nn.Module):
     """
@@ -77,24 +69,23 @@ class PyomoOptLayer(nn.Module):
         self.parameter = parameters
         self.known_parameters = known_parameters
         self.free_parameters = free_parameters
-        self.obj_weight = None
         self.nlp_var = PyomoNLP(concrete_model)
         self.init_pyomo_varorder()
-
-    def get_nlp_full(self, para):
+        self.training = True
+        
+    def get_nlp_full(self):
         model = self.concrete_model
         # Unfix the param variables for Jac/Hessian evaluation
         for param in model.component_objects(pyo.Var):
-            if any(param is v for v in para):
+            if param in self.grad_parameters:
                 for index in param:
                     param[index].unfix() 
-        nlp_full = PyomoNLP(model)
+        self.nlp_full = PyomoNLP(model)
         # Fix the param variables
         for param in model.component_objects(pyo.Var):
-            if any(param is v for v in para):
+            if param in self.grad_parameters:
                 for index in param:
                     param[index].fix()
-        return nlp_full
     
     def init_pyomo_varorder(self):
         if self.free_parameters:
@@ -107,7 +98,7 @@ class PyomoOptLayer(nn.Module):
         for var in self.concrete_model.component_objects(pyo.Var, active=True):
             # Scaler
             if not var.is_indexed():
-                self.parameters_size[var.name] = [1]
+                self.parameters_size[var.name] = [0]
             else: 
                 index_set = var.index_set()
                 self.parameters_size[var.name] = [len(s) for s in index_set.subsets()]
@@ -115,32 +106,28 @@ class PyomoOptLayer(nn.Module):
         self.vars_to_indices = {}
         for p in self.parameter:
             if not p.is_indexed():
-                pass
-                # self.vars_to_indices[p.name] = 0
+                self.vars_to_indices[p.name] = 0
             else:
                 self.vars_to_indices[p] = pyo.ComponentMap()
                 for idx, var in enumerate(p.values()):
                     self.vars_to_indices[p][var] = idx
-
-        self.nlp_full = self.get_nlp_full(para = self.parameter)
-            
+        
+        self.get_nlp_full()
         # self.pyomo_cons = self.nlp_full.get_pyomo_constraints()
         pyomo_vars_full = self.nlp_full.get_pyomo_variables()
         pyomo_variables_vars = ComponentSet(self.nlp_var.get_pyomo_variables())
         # Use nlp_var = ProjectedExtendedNLP(nlp_full, var_names) in get_sen() function, make sure the var_order matches nlp_full.pyomo_variables()
         self.var_names = []
         self.vars_objs = [] # nlp.extract_submatrix_hessian_lag(vars_objs) follows nlp_full pyomo_variables order
-
         for var in pyomo_vars_full:
             # actual vars
             if var in pyomo_variables_vars:
                 self.var_names.append(var.name)
                 self.vars_objs.append(var)
-
+        
         var_to_idx = pyo.ComponentMap()
         for idx, var in enumerate(self.vars_objs):
             var_to_idx[var] = idx
-
         # obtain the order difference of nlp_full.get_pyomo_variable and variables given by the user
         self.variables_index_order = []
         for var in self.variables:
@@ -149,6 +136,7 @@ class PyomoOptLayer(nn.Module):
                     self.variables_index_order.append(var_to_idx[v])
             else:
                 self.variables_index_order.append(var_to_idx[var])
+
         self.sensitivity = Sensitivity(self) 
 
     def forward(self, *batch_params):
@@ -183,6 +171,7 @@ class PyomoOptLayer(nn.Module):
                             parameters = self.parameter, parameters_size = self.parameters_size, vars_to_indices = self.vars_to_indices, \
                             known_parameters = self.known_parameters, grad_parameters = self.grad_parameters, \
                             variables_index_order = self.variables_index_order, solver = self.solver, sensitivity = self.sensitivity)
+
             sol = f(*batch_params)
         else:
             with torch.no_grad(): 
@@ -201,52 +190,33 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
     class PyomoLayerFnFn(torch.autograd.Function):
         @staticmethod
         def forward(ctx, *batch_params):
-            local_primal_out = []
-            local_dual_out = []
-            local_J = []
-            batch_size = batch_params[0].shape[0]
-            # Split batch indices across MPI ranks
-            # local_batches = [i for i in range(batch_size) if i % size == rank]  # More balanced distribution 
-            local_batches = rank_partition(rank, size, batch_size)
-            # Each MPI process solves only its assigned batches
-            for batch in local_batches:
-                params = [p[batch] for p in batch_params]  # Get batch parameters
-                # TODO single_solve(concrete_modified_model)
+            J = []
+            lhs_J = []
+            rhs_J = []
+            # solve over minibatch by just iterating
+            for batch in range(batch_params[0].shape[0]):
+                params = [p[batch] for p in batch_params]
                 vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
-                # vars = torch.tensor(vars, dtype=batch_params[0].dtype, device=batch_params[0].device).view(-1).requires_grad_(True)
+                vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(True)
+                # A Jacobian matrix of the (decision variables) with respect to parameters
                 dfullvar_dp, lhs_Jac, rhs_Jac, duals = sensitivity.get_sen(concrete_model)
-                grad = dfullvar_dp[variables_index_order, :]
-                # print("grad", grad)
-                local_primal_out.append(vars)
-                local_dual_out.append(duals)
-                local_J.append(grad)
-            
-            if size == 1:
-                all_primal_out = [np.array(local_primal_out, dtype=np.float32) for _ in range(size)]
-                all_dual_out = [np.array(local_dual_out, dtype=np.float32) for _ in range(size)]
-                all_J = [np.array(local_J, dtype=np.float32) for _ in range(size)]
-            else:
-                all_primal_out = comm.allgather(np.array(local_primal_out, dtype=np.float32))
-                all_dual_out = comm.allgather(np.array(local_dual_out, dtype=np.float32))
-                all_J = comm.allgather(np.array(local_J, dtype=np.float32))
-            
-            all_primal_out = [arr for arr in all_primal_out if arr.size > 0]
-            all_dual_out = [arr for arr in all_dual_out if arr.size > 0]
-            all_J = [arr for arr in all_J if arr.size > 0]
-
-            primal_out = torch.from_numpy(np.concatenate(all_primal_out, axis=0)).requires_grad_(True)
-            dual_out = torch.from_numpy(np.concatenate(all_dual_out, axis=0)).requires_grad_(False)
-            J = torch.from_numpy(np.concatenate(all_J, axis=0)).requires_grad_(False)
-            ctx.save_for_backward(J)
-            return primal_out, dual_out, J
+                if batch == 0:
+                    primal_out = torch.zeros((batch_params[0].shape[0], len(vars)))
+                    dual_out = torch.zeros((batch_params[0].shape[0], len(duals)))
+                primal_out[batch] = vars
+                dual_out[batch] = torch.tensor(duals)
+                J.append(dfullvar_dp[variables_index_order, :])
+                lhs_J.append(lhs_Jac)
+                rhs_J.append(rhs_Jac)
+            ctx.save_for_backward(torch.tensor(np.array(J), dtype=torch.float64))
+            return primal_out, dual_out, lhs_J, rhs_J
 
         @staticmethod
-        def backward(ctx, grad_out, dual_dummy = 0, J_dummy = 0):
+        def backward(ctx, grad_out, dual_dummy = 0, Jac_dummy = 0, rhs_dummy = 0):
+            
             batch_size = grad_out.shape[0]
             Jac, = ctx.saved_tensors
-            Jac = Jac.to(dtype=grad_out.dtype)
             grad = (Jac.transpose(1, 2).bmm(grad_out.unsqueeze(-1))).squeeze(-1)
-  
             grad_reshape = []
             start = 0
             for _, p in enumerate(parameters):
@@ -262,6 +232,7 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
                 grad_reshape.extend([None] * len(known_parameters))
             grad_reshape = tuple(grad_reshape)
             return *grad_reshape, None
+
     return PyomoLayerFnFn.apply
 
 def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver):
@@ -272,21 +243,14 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
     class PyomoLayerFnFn_eval(torch.autograd.Function):
         @staticmethod
         def forward(ctx, *batch_params):
-            batch_size = batch_params[0].shape[0]
-            # Split batch indices across MPI ranks
-            # local_batches = [i for i in range(batch_size) if i % size == rank]  # More balanced distribution 
-            local_batches = rank_partition(rank, size, batch_size)
-            # Each MPI process solves only its assigned batches
-            local_results = []
-            for batch in local_batches:
-                params = [p[batch] for p in batch_params]  # Get batch parameters
+            for batch in range(batch_params[0].shape[0]):
+                params = [p[batch] for p in batch_params]
                 vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
-                local_results.append(vars)
+                vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(False)
 
-            all_results = comm.allgather(np.array(local_results))
-            all_results = [arr for arr in all_results if arr.size > 0]
-            primal_out = torch.from_numpy(np.concatenate(all_results, axis=0)).requires_grad_(False)
-
+                if batch == 0:
+                    primal_out = torch.zeros((batch_params[0].shape[0], len(vars)))
+                primal_out[batch] = vars
             return primal_out, None, None, None
 
         @staticmethod
@@ -295,14 +259,6 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
 
     return PyomoLayerFnFn_eval.apply
 
-def rank_partition(rank, size, batch_size):
-    base = batch_size // size
-    remainder = batch_size % size
-
-    start = rank * base + min(rank, remainder)
-    end = start + base + (1 if rank < remainder else 0)
-    return list(range(start, end))
-
 def single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params):
     # solve over minibatch by just iterating
     with torch.no_grad():
@@ -310,7 +266,7 @@ def single_solve(concrete_model, variables, parameters, vars_to_indices, known_p
         for index, p_name in enumerate(parameters):
             params_flat = params_[index].reshape(-1)
             if not p_name.is_indexed():
-                p_name.fix(params_flat.item())
+                p_name.fix(params_flat)
             else:
                 for var, idx in vars_to_indices[p_name].items():
                     var.fix(params_flat[idx])
@@ -320,14 +276,11 @@ def single_solve(concrete_model, variables, parameters, vars_to_indices, known_p
                 params_flat = params_[end_ + index].reshape(-1)
                 for idx, p_idx in enumerate(p_name.keys()):
                     p_name[p_idx] = params_flat[idx] 
-        
+                
         result = solver.solve(concrete_model, tee=False)
-        
         if not pyo.check_optimal_termination(result):
-            raise RuntimeWarning("IPOPT failed to converge!")
+            raise RuntimeError("IPOPT failed to converge!")
         vars = []
         for var in variables:
             vars += [var[i].value for i in var]
-
     return vars
-

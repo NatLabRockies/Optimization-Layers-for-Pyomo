@@ -77,7 +77,6 @@ class PyomoOptLayer(nn.Module):
         self.parameter = parameters
         self.known_parameters = known_parameters
         self.free_parameters = free_parameters
-        self.obj_weight = None
         self.nlp_var = PyomoNLP(concrete_model)
         self.init_pyomo_varorder()
 
@@ -122,15 +121,14 @@ class PyomoOptLayer(nn.Module):
                 for idx, var in enumerate(p.values()):
                     self.vars_to_indices[p][var] = idx
 
+
         self.nlp_full = self.get_nlp_full(para = self.parameter)
-            
         # self.pyomo_cons = self.nlp_full.get_pyomo_constraints()
         pyomo_vars_full = self.nlp_full.get_pyomo_variables()
         pyomo_variables_vars = ComponentSet(self.nlp_var.get_pyomo_variables())
         # Use nlp_var = ProjectedExtendedNLP(nlp_full, var_names) in get_sen() function, make sure the var_order matches nlp_full.pyomo_variables()
         self.var_names = []
         self.vars_objs = [] # nlp.extract_submatrix_hessian_lag(vars_objs) follows nlp_full pyomo_variables order
-
         for var in pyomo_vars_full:
             # actual vars
             if var in pyomo_variables_vars:
@@ -140,7 +138,6 @@ class PyomoOptLayer(nn.Module):
         var_to_idx = pyo.ComponentMap()
         for idx, var in enumerate(self.vars_objs):
             var_to_idx[var] = idx
-
         # obtain the order difference of nlp_full.get_pyomo_variable and variables given by the user
         self.variables_index_order = []
         for var in self.variables:
@@ -204,6 +201,8 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             local_primal_out = []
             local_dual_out = []
             local_J = []
+            local_lhs_Jac = []
+            local_rhs_Jac = []
             batch_size = batch_params[0].shape[0]
             # Split batch indices across MPI ranks
             # local_batches = [i for i in range(batch_size) if i % size == rank]  # More balanced distribution 
@@ -214,12 +213,15 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
                 # TODO single_solve(concrete_modified_model)
                 vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
                 # vars = torch.tensor(vars, dtype=batch_params[0].dtype, device=batch_params[0].device).view(-1).requires_grad_(True)
-                dfullvar_dp, lhs_Jac, rhs_Jac, duals = sensitivity.get_sen(concrete_model)
+                dfullvar_dp, lhs_Jac, rhs_Jac, duals = sensitivity.get_sen(concrete_model, correction = False)
+                # the user does not want slack mode    
                 grad = dfullvar_dp[variables_index_order, :]
                 # print("grad", grad)
                 local_primal_out.append(vars)
                 local_dual_out.append(duals)
                 local_J.append(grad)
+                local_lhs_Jac.append(lhs_Jac)
+                local_rhs_Jac.append(rhs_Jac)
             
             if size == 1:
                 all_primal_out = [np.array(local_primal_out, dtype=np.float32) for _ in range(size)]
@@ -229,7 +231,10 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
                 all_primal_out = comm.allgather(np.array(local_primal_out, dtype=np.float32))
                 all_dual_out = comm.allgather(np.array(local_dual_out, dtype=np.float32))
                 all_J = comm.allgather(np.array(local_J, dtype=np.float32))
-            
+
+            # all_lhs_Jac = comm.allgather(local_lhs_Jac)
+            # all_rhs_Jac = comm.allgather(local_rhs_Jac)
+            all_lhs_Jac, all_rhs_Jac = None, None
             all_primal_out = [arr for arr in all_primal_out if arr.size > 0]
             all_dual_out = [arr for arr in all_dual_out if arr.size > 0]
             all_J = [arr for arr in all_J if arr.size > 0]
@@ -238,15 +243,14 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             dual_out = torch.from_numpy(np.concatenate(all_dual_out, axis=0)).requires_grad_(False)
             J = torch.from_numpy(np.concatenate(all_J, axis=0)).requires_grad_(False)
             ctx.save_for_backward(J)
-            return primal_out, dual_out, J
+            return primal_out, dual_out, all_lhs_Jac, all_rhs_Jac, J
 
         @staticmethod
-        def backward(ctx, grad_out, dual_dummy = 0, J_dummy = 0):
+        def backward(ctx, grad_out, dual_dummy = 0, Jac_dummy = 0, rhs_dummy = 0, J_dummy = 0):
             batch_size = grad_out.shape[0]
             Jac, = ctx.saved_tensors
-            Jac = Jac.to(dtype=grad_out.dtype)
-            grad = (Jac.transpose(1, 2).bmm(grad_out.unsqueeze(-1))).squeeze(-1)
-  
+            Jac = Jac.to(dtype = grad_out.dtype)
+            grad = (Jac.transpose(1, 2).bmm(grad_out.unsqueeze(-1))).squeeze(-1)  
             grad_reshape = []
             start = 0
             for _, p in enumerate(parameters):
@@ -264,7 +268,7 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             return *grad_reshape, None
     return PyomoLayerFnFn.apply
 
-def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver):
+def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, known_parameters, slacks, obj_weight, solver):
     """
     Descriptions: 
         The forward and backward function for the PyomoOptLayer module.
@@ -278,16 +282,25 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
             local_batches = rank_partition(rank, size, batch_size)
             # Each MPI process solves only its assigned batches
             local_results = []
+            local_results_slack = []
             for batch in local_batches:
                 params = [p[batch] for p in batch_params]  # Get batch parameters
-                vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
+                vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params, slacks, obj_weight)
                 local_results.append(vars)
 
             all_results = comm.allgather(np.array(local_results))
             all_results = [arr for arr in all_results if arr.size > 0]
             primal_out = torch.from_numpy(np.concatenate(all_results, axis=0)).requires_grad_(False)
 
-            return primal_out, None, None, None
+            # for batch in range(batch_params[0].shape[0]):
+            #     params = [p[batch] for p in batch_params]
+            #     vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
+            #     vars = torch.tensor(vars).type_as(params[0]).view(-1).requires_grad_(False)
+
+            #     if batch == 0:
+            #         primal_out = torch.zeros((batch_params[0].shape[0], len(vars)))
+            #     primal_out[batch] = vars
+            return primal_out, None, None, None, None
 
         @staticmethod
         def backward(ctx, grad_out, dual_dummy = 0, Jac_dummy = 0, rhs_dummy = 0):
@@ -320,14 +333,14 @@ def single_solve(concrete_model, variables, parameters, vars_to_indices, known_p
                 params_flat = params_[end_ + index].reshape(-1)
                 for idx, p_idx in enumerate(p_name.keys()):
                     p_name[p_idx] = params_flat[idx] 
-        
+     
         result = solver.solve(concrete_model, tee=False)
         
         if not pyo.check_optimal_termination(result):
-            raise RuntimeWarning("IPOPT failed to converge!")
+            print("IPOPT failed to converge! Please consider the slack model")
+            # raise RuntimeWarning("IPOPT failed to converge! Please consider the slack model")
         vars = []
         for var in variables:
             vars += [var[i].value for i in var]
-
     return vars
 
