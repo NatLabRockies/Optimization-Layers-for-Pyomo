@@ -17,7 +17,7 @@ import torch
 import time
 import torch.nn as nn
 import matplotlib.pyplot as plt
-from Opt_Layer.algorithms import fit
+from CVXPY_examples.algorithms import fit
 import math
 # %%
 def create_model(nominal_theta_param, nominal_x_param, nominal_lambda_param):

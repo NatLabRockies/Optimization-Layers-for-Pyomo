@@ -37,7 +37,6 @@ import torch
 import time
 import torch.nn as nn
 # import matplotlib.pyplot as plt
-from Opt_Layer.algorithms import fit
 
 # %%
 def create_model(nominal_W, nominal_b, nominal_x):

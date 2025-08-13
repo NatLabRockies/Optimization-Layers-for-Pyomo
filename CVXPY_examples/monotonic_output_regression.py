@@ -17,7 +17,7 @@ import torch
 import time
 import torch.nn as nn
 import matplotlib.pyplot as plt
-from Opt_Layer.algorithms import fit
+from CVXPY_examples.algorithms import fit
 # %%
 def create_model(nominal_y):
     # Create a concrete model
