@@ -127,7 +127,7 @@ def main():
     for i in range(eporch_num):
         if i == thre_epoch:
             opt.param_groups[0]["lr"] = lr_schedule
-        primal, _, _, _ = layer(X)
+        primal, _, _ = layer(X)
         loss = nn.MSELoss()(primal, Y)
         opt.zero_grad()
         loss.backward()

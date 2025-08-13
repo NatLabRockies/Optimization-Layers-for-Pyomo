@@ -169,7 +169,7 @@ def simulate(policy, n_iters=1000, seed=0, weights_tch = None, NN = None):
         elif NN:
             ut = policy(xt)[0] 
         else:
-            primal, _, _, _ = policy(xt.unsqueeze(0))
+            primal, _, _  = policy(xt.unsqueeze(0))
             ut = primal[:, :m].squeeze(0)                                                    
         controls.append(ut)
         costs.append(stage_cost(xt.squeeze(0), ut).item())
@@ -265,7 +265,7 @@ def main():
     variables = [model.controls]
     parameters = [model.x]
     
-    Pyomolayer = PyomoOptLayer(model, variables, parameters, solver = 'ipopt')
+    Pyomolayer = PyomoOptLayer(model, variables, parameters)
 
     states, controls, costs = simulate(Pyomolayer)
     

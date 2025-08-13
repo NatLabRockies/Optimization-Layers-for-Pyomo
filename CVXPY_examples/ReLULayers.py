@@ -101,11 +101,11 @@ class ReluLayer(torch.nn.Module):
         # when x is batched, repeat W and b 
         if x.ndim == 2:
             batch_size = x.shape[0]
-            out, _, _, _, _ = self.layer(self.W.repeat(batch_size, 1, 1), self.b.repeat(batch_size, 1), x)
+            out, _, _ = self.layer(self.W.repeat(batch_size, 1, 1), self.b.repeat(batch_size, 1), x)
             z = out
             return z
         else:
-            out, _, _, _, _ = self.layer(self.W, self.b, x)
+            out, _, _ = self.layer(self.W, self.b, x)
             z = out
             return z
 # %% Test the Pyomo model

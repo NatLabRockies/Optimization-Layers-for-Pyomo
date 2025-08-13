@@ -120,7 +120,7 @@ def main():
         cost = 0.
         for _ in range(T):
             input = tuple([q.unsqueeze(0), P_21.unsqueeze(0), P_sqrt.unsqueeze(0), x.unsqueeze(0)])
-            primal, _, _, _, _= Pyomolayer(*input)
+            primal, _, _= Pyomolayer(*input)
             u = primal.T
             cost += g(x, u) / T
             x = A_tch @ x + B_tch @ u + .2 * torch.randn(n, 1).double()

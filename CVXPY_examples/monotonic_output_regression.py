@@ -71,12 +71,12 @@ def get_data(N, n1, n, theta):
     torch.manual_seed(0)
     X = torch.randn(N, n1)
     input = tuple([X @ theta + torch.randn(N, n)])
-    primal, _, _, _ = Pyomolayer(*input)
+    primal, _, _ = Pyomolayer(*input)
     return X, primal
 
 def loss(X, Y, theta, mse):
     input = tuple([X @ theta])
-    primal, _, _, _ = Pyomolayer(*input)
+    primal, _, _ = Pyomolayer(*input)
     return mse(primal, Y)
 # %% Main function  
 def main():
@@ -103,7 +103,7 @@ def main():
     theta.requires_grad_(True)
 
     input = tuple([Xval @ theta_true])
-    primal, _, _, _ = Pyomolayer(*input)
+    primal, _, _ = Pyomolayer(*input)
     bayes_val_loss = mse_loss(primal, Yval).item()
 
     val_losses, train_losses = fit(lambda X, Y: loss(X, Y, theta, mse_loss), [theta], X, Y, Xval, Yval,

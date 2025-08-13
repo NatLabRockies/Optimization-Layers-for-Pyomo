@@ -198,7 +198,7 @@ def main():
     lowest_loss = np.inf
     for value in lambda_values:
         batch_size = X_train.shape[0]
-        primal, _, _, _ = Pyomolayer_withouttheta(X_train, value.repeat(batch_size, 1))
+        primal, _, _ = Pyomolayer_withouttheta(X_train, value.repeat(batch_size, 1))
         preds = primal
         mse_per_example = (preds - Y_train).pow(2).mean(axis=1)
         mse = mse_per_example.mean()
@@ -209,7 +209,7 @@ def main():
             best_lambda = value
     print("best_lambda", best_lambda)
     print("lowest_loss", lowest_loss)
-    primal, _, _, _ = Pyomolayer_withouttheta(X_val, best_lambda.repeat(X_val.shape[0], 1))
+    primal, _, _ = Pyomolayer_withouttheta(X_val, best_lambda.repeat(X_val.shape[0], 1))
     one_param_preds = primal
     mse_per_example = (one_param_preds - Y_val).pow(2).mean(axis=1)
     one_param_mse = mse_per_example.mean()
