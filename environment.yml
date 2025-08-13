@@ -1,4 +1,4 @@
-name: OPT_layer_env-clone
+name: OPT_layer_env
 channels:
   - http://conda.anaconda.org/gurobi
   - https://conda.anaconda.org/gurobi

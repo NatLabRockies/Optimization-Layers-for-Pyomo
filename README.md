@@ -9,7 +9,7 @@ pytest Opt_Layer/tests/regression_test.py
 ```
 # Installation 
 ```bash
-conda create --name OPT_layer_env python=3.11.0
+conda env create -f environment.yml
 conda activate OPT_layer_env
 conda install conda-forge::mumps-include
 conda install conda-forge::mumps-mpi
