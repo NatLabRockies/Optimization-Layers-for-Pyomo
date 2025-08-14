@@ -6,6 +6,8 @@ import numpy as np
 import datetime
 import subprocess
 
+import shutil
+
 test_dir = os.path.dirname(os.path.realpath(__file__))
 # Obtain the gradient ansa save them in the current_results folder.
 # Paths to the folders
@@ -26,7 +28,7 @@ print("Files only in Folder base_result:", base_result_files - current_result_fi
 print("Files only in Folder current_result:", current_result_files - base_result_files)
 
 @pytest.mark.parametrize("file", common_files)
-def test_regression(file):
+def test_regression(file, clear_files_teardown):
     base_array = np.load(os.path.join(base_results, file))
     current_array = np.load(os.path.join(current_results, file))
     
@@ -44,3 +46,9 @@ def test_regression(file):
     # Compute difference summary
     diff = np.abs(base_array - current_array)
     print(f"{file}: Differences found. Max diff: {np.max(diff)}, Mean diff: {np.mean(diff)}")
+
+@pytest.fixture(scope='module')
+def clear_files_teardown():
+    # cleanup test dir
+    yield None
+    shutil.rmtree(current_results)
