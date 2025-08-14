@@ -34,6 +34,8 @@ def test_regression(file):
     if base_array.shape != current_array.shape:
         print(f"Shape mismatch in {file}: {base_array.shape} vs {current_array.shape}")
         assert not (base_array.shape[0] > 0 and current_array.shape[0] > 0)
+        # expect failure here because of changes since baseline
+        assert file == "QCQP_bvalG.npy"
         return
     # If the shapes are the same, compare arrays
     if np.array_equal(base_array, current_array):
