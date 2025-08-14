@@ -123,7 +123,7 @@ def main():
 
     ax[1].plot(Xval[13] @ theta_lstsq, '-.', c='red', label='LR')
     input = tuple([(Xval[13] @ theta).unsqueeze(0)])
-    output, _, _, _ = Pyomolayer(*input)
+    output, _, _ = Pyomolayer(*input)
     ax[1].plot(output[0].detach().numpy(), c='k', label='Pyomo')
     ax[1].plot(Yval[13].numpy(), '--', c='blue', label='true')
     ax[1].legend()
