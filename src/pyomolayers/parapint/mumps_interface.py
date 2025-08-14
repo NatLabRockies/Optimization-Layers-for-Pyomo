@@ -14,6 +14,10 @@ class MumpsInterface(LinearSolverInterface):
     def getLoggerName(cls):
         return 'mumps'
 
+    @classmethod
+    def available(cls):
+        return mumps_available
+
     def __init__(self, par=1, comm=None, cntl_options=None, icntl_options=None):
         self._mumps = mumps.MumpsCentralizedAssembledLinearSolver(sym=2,
                                                                   par=par,

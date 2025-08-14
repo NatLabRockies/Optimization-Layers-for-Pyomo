@@ -12,6 +12,12 @@ authors = [
 description = "Pyomo optimization layers"
 readme = "README.md"
 requires-python = ">=3.9"
+dependencies = [
+    "pyomo",
+    "torch",
+    "numpy",
+    "scipy",
+]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",

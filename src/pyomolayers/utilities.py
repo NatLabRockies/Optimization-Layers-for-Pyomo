@@ -335,9 +335,12 @@ class Sensitivity:
         self.debug = True
         self.IPsolver = IPOptions()
         self.IPsolver.use_inertia_correction = True
-        self.IPsolver.linalg.solver = MumpsInterface(comm=rank_comm)
-        # self.IPsolver.linalg.solver = InteriorPointMA27Interface()
-        # self.IPsolver.linalg.solver = ScipyInterface(compute_inertia=self.IPsolver.use_inertia_correction)
+        if InteriorPointMA27Interface.available():
+            self.IPsolver.linalg.solver = InteriorPointMA27Interface()
+        elif MumpsInterface.available():
+            self.IPsolver.linalg.solver = MumpsInterface(comm=rank_comm)
+        else:
+            self.IPsolver.linalg.solver = ScipyInterface(compute_inertia=self.IPsolver.use_inertia_correction)
 
     def get_sen(self, concrete_model):
         """

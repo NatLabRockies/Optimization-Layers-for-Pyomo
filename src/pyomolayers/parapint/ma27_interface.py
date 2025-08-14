@@ -33,6 +33,10 @@ class InteriorPointMA27Interface(LinearSolverInterface):
     def getLoggerName(cls):
         return 'ma27'
 
+    @classmethod
+    def available(cls):
+        return MA27Interface.available()
+
     def __init__(self, cntl_options=None, icntl_options=None, iw_factor=1.2, a_factor=2):
         self._ma27 = MA27Interface(iw_factor=iw_factor, a_factor=a_factor)
 
