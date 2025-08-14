@@ -17,6 +17,7 @@ dependencies = [
     "torch",
     "numpy",
     "scipy",
+    "idaes-pse", # HACK: for PyNumero, ASL, ipopt
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
