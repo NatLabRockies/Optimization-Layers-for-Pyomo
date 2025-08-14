@@ -3,11 +3,11 @@ import torch
 import copy
 from scipy.sparse import coo_matrix, identity, diags
 from scipy.sparse.linalg import spsolve, lsqr 
-from Opt_Layer.parapint.interior_point import IPOptions, ip_solve_optimal
-from Opt_Layer.parapint.interface import BaseInteriorPointInterface
-from Opt_Layer.parapint.mumps_interface import MumpsInterface
-from Opt_Layer.parapint.scipy_interface import ScipyInterface
-from Opt_Layer.parapint.ma27_interface import InteriorPointMA27Interface
+from pyomolayers.parapint.interior_point import IPOptions, ip_solve_optimal
+from pyomolayers.parapint.interface import BaseInteriorPointInterface
+from pyomolayers.parapint.mumps_interface import MumpsInterface
+from pyomolayers.parapint.scipy_interface import ScipyInterface
+from pyomolayers.parapint.ma27_interface import InteriorPointMA27Interface
 
 import pyomo.environ as pyo
 from pyomo.contrib.pynumero.interfaces.pyomo_nlp import PyomoNLP

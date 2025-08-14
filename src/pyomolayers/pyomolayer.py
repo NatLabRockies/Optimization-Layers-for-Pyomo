@@ -9,7 +9,7 @@ import pyomo.environ as pyo
 from pyomo.common.collections import ComponentSet
 from pyomo.contrib.pynumero.interfaces.pyomo_nlp import PyomoNLP
 import copy
-from Opt_Layer.utilities import Sensitivity
+from pyomolayers.utilities import Sensitivity
 torch.set_default_dtype(torch.float64)
 import logging
 logging.getLogger('pyomo.core').setLevel(logging.ERROR)
