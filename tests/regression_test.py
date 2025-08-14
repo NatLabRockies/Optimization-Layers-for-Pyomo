@@ -6,15 +6,14 @@ import numpy as np
 import datetime
 import subprocess
 
-current_dir = os.getcwd()
-sys.path.append(current_dir) # Add the parent directory to Python's search path
+test_dir = os.path.dirname(os.path.realpath(__file__))
 # Obtain the gradient ansa save them in the current_results folder.
 # Paths to the folders
-base_results = os.path.join(current_dir, "tests/regressiontests/results_12172024")
-current_results = os.path.join(current_dir, "tests/regressiontests/results_" + datetime.date.today().strftime("%Y%m%d"))
+base_results = os.path.join(test_dir, "regressiontests/results_12172024")
+current_results = os.path.join(test_dir, "regressiontests/results_" + datetime.date.today().strftime("%Y%m%d"))
 
-subprocess.run(["python", os.path.join(current_dir, "tests/QP_test.py"), "1"], check=True)
-subprocess.run(["python", os.path.join(current_dir, "tests/QCQP_test.py"), "1"], check=True)
+subprocess.run(["python", os.path.join(test_dir, "QP_test.py"), "1"], check=True)
+subprocess.run(["python", os.path.join(test_dir, "QCQP_test.py"), "1"], check=True)
 
 # List files in both folders
 base_result_files = set(os.listdir(base_results))
