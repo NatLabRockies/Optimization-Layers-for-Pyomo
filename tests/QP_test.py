@@ -13,7 +13,6 @@ import sys
 import os
 import datetime
 
-sys.path.append(os.getcwd()) # Add the parent directory to Python's search path
 test_dir = os.path.dirname(os.path.realpath(__file__))
 results_dir = os.path.join(test_dir, "regressiontests", "results_" + datetime.date.today().strftime("%Y%m%d"))
 if not os.path.exists(results_dir):

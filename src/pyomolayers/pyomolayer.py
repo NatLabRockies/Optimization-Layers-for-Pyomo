@@ -3,12 +3,9 @@ import torch
 # from mpi4py import MPI
 import copy
 import torch.nn as nn
-import sys
-sys.path.append('..')  # Add the parent directory to Python's search path
 import pyomo.environ as pyo
 from pyomo.common.collections import ComponentSet
 from pyomo.contrib.pynumero.interfaces.pyomo_nlp import PyomoNLP
-import copy
 from pyomolayers.utilities import Sensitivity
 torch.set_default_dtype(torch.float64)
 import logging

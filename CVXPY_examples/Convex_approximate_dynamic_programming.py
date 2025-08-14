@@ -36,11 +36,7 @@
 # could be solved exactly, via linear quadratic regulator (LQR) theory.
 
 # %%
-import sys
 import os
-current_dir = os.getcwd()
-sys.path.append(current_dir) # Add the parent directory to Python's search path
-results_dir = os.path.join(current_dir, "examples/results")
 
 import pyomo.environ as pyo
 import numpy as np
@@ -52,6 +48,11 @@ import matplotlib.pyplot as plt
 from scipy.linalg import solve_discrete_are
 from scipy.linalg import sqrtm
 import time
+
+this_dir = os.path.dirname(os.path.realpath(__file__))
+results_dir = os.path.join(this_dir, "results")
+os.makedirs(results_dir, exist_ok=True)
+
 # %%
 def create_model(nominal_q, nominal_P21, nominal_Psqrt, nominal_x):
     # Create a concrete model

@@ -4,11 +4,7 @@
 # This notebook accompanies the paper [Learning Convex Optimization Models](https://web.stanford.edu/~boyd/papers/learning_copt_models.html).
 
 # %%
-import sys
 import os
-current_dir = os.getcwd()
-sys.path.append(current_dir) # Add the parent directory to Python's search path
-results_dir = os.path.join(current_dir, "examples/results_12172024")
 
 import pyomo.environ as pyo
 import numpy as np
@@ -17,7 +13,12 @@ import torch
 import time
 import torch.nn as nn
 import matplotlib.pyplot as plt
-from CVXPY_examples.algorithms import fit
+from utils import fit
+
+this_dir = os.path.dirname(os.path.realpath(__file__))
+results_dir = os.path.join(this_dir, "results")
+os.makedirs(results_dir, exist_ok=True)
+
 # %%
 def create_model(nominal_y):
     # Create a concrete model
