@@ -163,7 +163,7 @@ def simulate(policy, n_iters=1000, seed=0, weights_tch = None, NN = None):
     for t in range(n_iters):
         xt = states[-1]
         if weights_tch:
-            primal, _, _, _ = policy(xt.unsqueeze(0), weights_tch)
+            primal, _, _ = policy(xt.unsqueeze(0), weights_tch)
             ut = primal[:, :m].squeeze(0) 
         elif NN:
             ut = policy(xt)[0] 
@@ -183,7 +183,7 @@ def simulate_adp(policy, weights_tch, n_iters=1000, seed=0):
     costs = []
     for t in range(n_iters):
         xt = states[-1]
-        primal, _, _, _ = policy(xt.unsqueeze(0), weights_tch)
+        primal, _, _ = policy(xt.unsqueeze(0), weights_tch)
         ut = primal[:, :m].squeeze(0)                                                    
         controls.append(ut)
         costs.append(stage_cost(xt.squeeze(0), ut).item())
@@ -299,7 +299,7 @@ def main():
         print('Epoch: ', epoch)
         for xt, ut in zip(states, controls):
             opt.zero_grad()
-            primal, _, _, _ = Pyomolayer_adp(xt.unsqueeze(0), weights_tch)
+            primal, _, _ = Pyomolayer_adp(xt.unsqueeze(0), weights_tch)
             ut_hat = primal[:, :m].squeeze(0) 
             loss = (ut - ut_hat).pow(2).mean()
             loss.backward()
