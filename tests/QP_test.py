@@ -21,7 +21,7 @@ if not os.path.exists(results_dir):
 import pyomo.environ as pyo
 from pyomo.common.dependencies import attempt_import
 import numpy as np
-from pyomolayers.pyomolayer import PyomoOptLayer
+from pyomolayers import PyomoOptLayer
 import torch
 import time
 cp, cp_available = attempt_import(name="cvxpy")

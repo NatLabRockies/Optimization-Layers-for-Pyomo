@@ -12,7 +12,7 @@
 import os
 import pyomo.environ as pyo
 import numpy as np
-from pyomolayers.pyomolayer import PyomoOptLayer
+from pyomolayers import PyomoOptLayer
 import torch
 import time
 import torch.nn as nn
