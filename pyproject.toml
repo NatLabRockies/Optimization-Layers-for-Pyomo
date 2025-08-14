@@ -25,6 +25,11 @@ classifiers = [
 license = "BSD-3-Clause"
 license-files = ["LICEN[CS]E*"]
 
+[project.optional-dependencies]
+test = [
+  "pytest",
+]
+
 [project.urls]
 Homepage = "https://github.nrel.gov/MSOC/PyomoLayers"
 Issues = "https://github.nrel.gov/MSOC/PyomoLayers/issues"

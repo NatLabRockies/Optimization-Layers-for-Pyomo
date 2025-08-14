@@ -4,8 +4,8 @@ from pyomo.common.dependencies import attempt_import
 from scipy.sparse import isspmatrix_coo, tril
 from collections import OrderedDict
 import numpy as np
-mumps, mumps_available = attempt_import(name='pyomo.contrib.pynumero.linalg.mumps_interface',
-                                        error_message='pymumps is required to use the MumpsInterface')
+import pyomo.contrib.pynumero.linalg.mumps_interface as mumps
+_, mumps_available = attempt_import("mumps")
 
 
 class MumpsInterface(LinearSolverInterface):
@@ -16,7 +16,7 @@ class MumpsInterface(LinearSolverInterface):
 
     @classmethod
     def available(cls):
-        return mumps_available
+        return bool(mumps_available)
 
     def __init__(self, par=1, comm=None, cntl_options=None, icntl_options=None):
         self._mumps = mumps.MumpsCentralizedAssembledLinearSolver(sym=2,
