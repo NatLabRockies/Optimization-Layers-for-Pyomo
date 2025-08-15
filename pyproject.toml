@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyomo-layers"
+version = "0.0.1"
+authors = [
+  { name="Kejun Chen", email="Kejun.Chen@nrel.gov" },
+  { name="Bernard Knueven", email="Bernard.Knueven@nrel.gov" },
+]
+description = "Pyomo optimization layers"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pyomo",
+    "torch",
+    "numpy",
+    "scipy",
+    "idaes-pse", # HACK: for PyNumero, ASL, ipopt
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "BSD-3-Clause"
+license-files = ["LICEN[CS]E*"]
+
+[project.optional-dependencies]
+test = [
+  "pytest",
+]
+
+[project.urls]
+Homepage = "https://github.nrel.gov/MSOC/PyomoLayers"
+Issues = "https://github.nrel.gov/MSOC/PyomoLayers/issues"
+

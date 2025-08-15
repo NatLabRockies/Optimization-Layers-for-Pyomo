@@ -1,28 +1,20 @@
-# Opt_Layer
-# Requirements
+# PyomoLayers
+
+# Installation
 ```bash
-PyNumero, PyMUMPS, Homebrew
+pip install '.[test]'
+idaes get-extensions
 ```
+
 # Regression test
 ```bash
-pytest Opt_Layer/tests/regression_test.py 
+pytest tests/regression_test.py
 ```
-# Installation 
+
+# For higher performance, you might want to install MUMPS or MA27.
+# Here we show installation instructions for MUMPS.
 ```bash
-conda env create -f environment.yml
-conda activate OPT_layer_env
 conda install conda-forge::mumps-include
 conda install conda-forge::mumps-mpi
-brew install mpich
 pip install pymumps
-conda install -c conda-forge ipopt
-brew install cmake
-pyomo download-extension
-pyomo build-extensions
-cd Opt_Layer
-# Remove nvidia and triton packages in requirements.txt if installing on the local laptop 
-# conda install ipopt on the local laptop 
-pip install -e .
 ```
-
-

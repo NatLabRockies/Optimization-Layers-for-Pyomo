@@ -4,21 +4,21 @@
 # This notebook accompanies the paper [Learning Convex Optimization Models](https://web.stanford.edu/~boyd/papers/learning_copt_models.html).
 
 # %%
-import sys
 import os
-current_dir = os.getcwd()
-sys.path.append(current_dir) # Add the parent directory to Python's search path
-results_dir = os.path.join(current_dir, "examples/results")
-
 import pyomo.environ as pyo
 import numpy as np
-from Opt_Layer.pyomolayer import PyomoOptLayer
+from pyomolayers import PyomoOptLayer
 import torch
 import time
 import torch.nn as nn
 import matplotlib.pyplot as plt
-from CVXPY_examples.algorithms import fit
+from utils import fit
 import math
+
+this_dir = os.path.dirname(os.path.realpath(__file__))
+results_dir = os.path.join(this_dir, "results")
+os.makedirs(results_dir, exist_ok=True)
+
 # %%
 def create_model(nominal_theta_param, nominal_x_param, nominal_lambda_param):
     # Create a concrete model
@@ -129,7 +129,7 @@ def model_instance_withouttheta():
 
 def loss_fn(X, actual):
     batch_size = X.shape[0]
-    preds, _ , _, _ = Pyomolayer(theta_tch.repeat(batch_size, 1, 1), X, lambda_tch.repeat(batch_size, 1))
+    preds, _ , _ = Pyomolayer(theta_tch.repeat(batch_size, 1, 1), X, lambda_tch.repeat(batch_size, 1))
     y_cp = preds
     mse_per_example = (y_cp - actual).pow(2).mean(axis=1)
     return mse_per_example.mean()

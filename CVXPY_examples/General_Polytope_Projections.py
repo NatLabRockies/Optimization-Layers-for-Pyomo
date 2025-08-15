@@ -9,15 +9,10 @@
 # with the variable $\mathbf{x}$ and parameter $\mathbf{h}$.
 
 # %%
-import sys
 import os
-current_dir = os.getcwd()
-sys.path.append(current_dir) # Add the parent directory to Python's search path
-results_dir = os.path.join(current_dir, "examples/results")
-
 import pyomo.environ as pyo
 import numpy as np
-from Opt_Layer.pyomolayer import PyomoOptLayer
+from pyomolayers import PyomoOptLayer
 import torch
 import time
 import torch.nn as nn
@@ -26,6 +21,11 @@ import matplotlib.pyplot as plt
 from scipy.spatial import HalfspaceIntersection
 from matplotlib.patches import Polygon
 import torch.optim as optim
+
+this_dir = os.path.dirname(os.path.realpath(__file__))
+results_dir = os.path.join(this_dir, "results")
+os.makedirs(results_dir, exist_ok=True)
+
 # %%
 def create_model(nominal_G, nominal_h, nominal_p):
     m = pyo.ConcreteModel()
