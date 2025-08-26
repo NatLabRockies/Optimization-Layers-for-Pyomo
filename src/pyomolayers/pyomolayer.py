@@ -2,6 +2,7 @@ import numpy as np
 import torch
 # from mpi4py import MPI
 import copy
+import warnings
 import torch.nn as nn
 import pyomo.environ as pyo
 from pyomo.common.collections import ComponentSet
@@ -249,11 +250,11 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             grad_reshape = []
             start = 0
             for _, p in enumerate(parameters):
-                if p not in grad_parameters:
+                if not any(p is gp for gp in grad_parameters):
                     grad_reshape.append(None)
                     continue
                 size = copy.deepcopy(parameters_size[p.name])
-                param_length = len(list(concrete_model.component(p).keys()))
+                param_length = len(p)
                 size.insert(0, batch_size)
                 grad_reshape.append(grad[:, start:start+param_length].reshape(size))
                 start += param_length
@@ -323,7 +324,7 @@ def single_solve(concrete_model, variables, parameters, vars_to_indices, known_p
         result = solver.solve(concrete_model, tee=False)
         
         if not pyo.check_optimal_termination(result):
-            raise RuntimeWarning("IPOPT failed to converge!")
+            warnings.warn("IPOPT failed to converge!")
         var_values = []
         for var in variables:
             var_values += [var[i].value for i in var]
