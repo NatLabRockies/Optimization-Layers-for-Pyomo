@@ -211,12 +211,12 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             for batch in local_batches:
                 params = [p[batch] for p in batch_params]  # Get batch parameters
                 # TODO single_solve(concrete_modified_model)
-                vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
+                var_values = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
                 # vars = torch.tensor(vars, dtype=batch_params[0].dtype, device=batch_params[0].device).view(-1).requires_grad_(True)
                 dfullvar_dp, lhs_Jac, rhs_Jac, duals = sensitivity.get_sen(concrete_model)
                 grad = dfullvar_dp[variables_index_order, :]
                 # print("grad", grad)
-                local_primal_out.append(vars)
+                local_primal_out.append(var_values)
                 local_dual_out.append(duals)
                 local_J.append(grad)
             
@@ -279,8 +279,8 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
             local_results = []
             for batch in local_batches:
                 params = [p[batch] for p in batch_params]  # Get batch parameters
-                vars = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
-                local_results.append(vars)
+                var_values = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
+                local_results.append(var_values)
 
             all_results = comm.allgather(np.array(local_results))
             all_results = [arr for arr in all_results if arr.size > 0]
@@ -324,9 +324,9 @@ def single_solve(concrete_model, variables, parameters, vars_to_indices, known_p
         
         if not pyo.check_optimal_termination(result):
             raise RuntimeWarning("IPOPT failed to converge!")
-        vars = []
+        var_values = []
         for var in variables:
-            vars += [var[i].value for i in var]
+            var_values += [var[i].value for i in var]
 
-    return vars
+    return var_values
 
