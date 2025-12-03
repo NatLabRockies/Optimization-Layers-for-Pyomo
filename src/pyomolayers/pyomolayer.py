@@ -7,6 +7,7 @@ import torch.nn as nn
 import pyomo.environ as pyo
 from pyomo.common.collections import ComponentSet
 from pyomo.contrib.pynumero.interfaces.pyomo_nlp import PyomoNLP
+from pyomo.core.base.indexed_component_slice import IndexedComponent_slice
 from pyomolayers.utilities import Sensitivity
 torch.set_default_dtype(torch.float64)
 import logging
@@ -73,27 +74,58 @@ class PyomoOptLayer(nn.Module):
                                  "This can often lead to errors in KKT evaluations.")
         if "bound_relax_factor" not in self.solver.options:
             self.solver.options["bound_relax_factor"] = 1e-08
-        self.variables = variables
-        self.parameter = parameters
-        self.known_parameters = known_parameters
-        self.free_parameters = free_parameters
+        # self.variables = variables
+        # self.parameter = parameters
+        # self.known_parameters = known_parameters
+        # self.free_parameters = free_parameters
+        self.variables = self.expand_complist_to_compdata_list(variables)
+        self.parameter = self.expand_complist_to_compdata_list(parameters)
+        self.known_parameters = self.expand_complist_to_compdata_list(known_parameters)
+        self.free_parameters = self.expand_complist_to_compdata_list(free_parameters)
+
         self.obj_weight = None
         self.nlp_var = PyomoNLP(concrete_model)
         self.init_pyomo_varorder()
-
+        self.parameters_parent = self.collapse_to_components(parameters)
+        self.grad_parameters_parent = self.collapse_to_components(self.grad_parameters)
+    # Expand variable list to vardata list
+    def expand_complist_to_compdata_list(self, varlist):
+        if varlist is None:
+            return None
+        if isinstance(varlist, (pyo.Component, IndexedComponent_slice)):
+            # User provided a variable, not a list of variables.
+            # Let's work with it anyway
+            varlist = [varlist]
+        vardatalist = []
+        for var in varlist:
+            if isinstance(var, IndexedComponent_slice):
+                vardatalist.extend(var.__iter__())
+            elif var.is_indexed():
+                vardatalist.extend(var.values())
+            else:
+                vardatalist.append(var)
+        return vardatalist
+    def collapse_to_components(self, params):
+        comps = []
+        seen = set()
+        for p in params:
+            comp = p.parent_component()
+            if id(comp) not in seen:
+                comps.append(comp)
+                seen.add(id(comp))
+        return comps
     def get_nlp_full(self, para):
         model = self.concrete_model
         # Unfix the param variables for Jac/Hessian evaluation
-        for param in model.component_objects(pyo.Var):
+        for param in model.component_data_objects(pyo.Var):
             if any(param is v for v in para):
-                for index in param:
-                    param[index].unfix() 
+                param.unfix()
+
         nlp_full = PyomoNLP(model)
         # Fix the param variables
-        for param in model.component_objects(pyo.Var):
+        for param in model.component_data_objects(pyo.Var):
             if any(param is v for v in para):
-                for index in param:
-                    param[index].fix()
+                param.fix()
         return nlp_full
     
     def init_pyomo_varorder(self):
@@ -182,7 +214,8 @@ class PyomoOptLayer(nn.Module):
             f = PyomoLayerFn(concrete_model = self.concrete_model, variables = self.variables,  \
                             parameters = self.parameter, parameters_size = self.parameters_size, vars_to_indices = self.vars_to_indices, \
                             known_parameters = self.known_parameters, grad_parameters = self.grad_parameters, \
-                            variables_index_order = self.variables_index_order, solver = self.solver, sensitivity = self.sensitivity)
+                            variables_index_order = self.variables_index_order, solver = self.solver, sensitivity = self.sensitivity, \
+                            parameters_parent = self.parameters_parent, grad_parameters_parent = self.grad_parameters_parent)
             sol = f(*batch_params)
         else:
             with torch.no_grad(): 
@@ -193,7 +226,7 @@ class PyomoOptLayer(nn.Module):
         return sol
         
 def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to_indices, known_parameters, grad_parameters, \
-                 variables_index_order, solver, sensitivity):
+                 variables_index_order, solver, sensitivity, parameters_parent, grad_parameters_parent):
     """
     Descriptions: 
         The forward and backward function for the PyomoOptLayer module.
@@ -249,8 +282,8 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
   
             grad_reshape = []
             start = 0
-            for _, p in enumerate(parameters):
-                if not any(p is gp for gp in grad_parameters):
+            for _, p in enumerate(parameters_parent):
+                if not any(p is gp for gp in grad_parameters_parent):
                     grad_reshape.append(None)
                     continue
                 size = copy.deepcopy(parameters_size[p.name])
@@ -307,19 +340,14 @@ def single_solve(concrete_model, variables, parameters, vars_to_indices, known_p
     # solve over minibatch by just iterating
     with torch.no_grad():
         params_ = [p.detach().clone().double().numpy() for p in params]
+        params_flat = np.concatenate([p.flatten() for p in params_])
         for index, p_name in enumerate(parameters):
-            params_flat = params_[index].reshape(-1)
-            if not p_name.is_indexed():
-                p_name.fix(params_flat.item())
-            else:
-                for var, idx in vars_to_indices[p_name].items():
-                    var.fix(params_flat[idx])
+            p_name.fix(params_flat[index])
+
         end_ = index + 1
         if known_parameters:
             for index, p_name in enumerate(known_parameters):
-                params_flat = params_[end_ + index].reshape(-1)
-                for idx, p_idx in enumerate(p_name.keys()):
-                    p_name[p_idx] = params_flat[idx] 
+                p_name[index] = params_flat[index + end_] 
         
         result = solver.solve(concrete_model, tee=False)
         
@@ -327,7 +355,7 @@ def single_solve(concrete_model, variables, parameters, vars_to_indices, known_p
             warnings.warn("IPOPT failed to converge!")
         var_values = []
         for var in variables:
-            var_values += [var[i].value for i in var]
+            var_values.append(var.value)
 
     return var_values
 

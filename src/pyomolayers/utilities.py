@@ -320,8 +320,7 @@ class Sensitivity:
 
         self.param_order = []
         for p_name in self.grad_parameters:
-            for i in p_name.index_set():
-                self.param_order.append(str(p_name[i]))
+            self.param_order.append(str(p_name))
 
         self.pyomo_cons = self.nlp_full.get_pyomo_constraints()
         self.pyomo_vars_full = self.nlp_full.get_pyomo_variables()

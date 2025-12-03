@@ -286,7 +286,7 @@ def main():
     variables = [model_mpc.controls]
     parameters = [model_mpc.x, model_mpc.weights]
     
-    Pyomolayer_adp = PyomoOptLayer(model_mpc, variables, parameters, solver = 'ipopt')
+    Pyomolayer_adp = PyomoOptLayer(model_mpc, variables, parameters)
     
     val_losses = []
     losses = []
