@@ -323,7 +323,7 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
             return primal_out, None, None, None
 
         @staticmethod
-        def backward(ctx, grad_out, 0, 0, 0):
+        def backward(ctx, grad_out, dual_dummy = 0, Jac_dummy = 0, rhs_dummy = 0):
             return None
 
     return PyomoLayerFnFn_eval.apply
