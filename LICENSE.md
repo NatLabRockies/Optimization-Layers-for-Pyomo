@@ -1,6 +1,6 @@
 BSD 3-Clause License
  
-Copyright (c) 2025 Alliance for Sustainable Energy, LLC, et al.
+Copyright (c) 2026 Alliance for Energy Innovation, LLC.
  
 All rights reserved.
  
