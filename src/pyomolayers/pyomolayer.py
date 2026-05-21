@@ -12,7 +12,6 @@ from pyomolayers.utilities import Sensitivity
 torch.set_default_dtype(torch.float64)
 import logging
 logging.getLogger('pyomo.core').setLevel(logging.ERROR)
-import time
 
 # comm = MPI.COMM_WORLD  # Initialize MPI
 # rank = comm.Get_rank()  # Process ID
@@ -74,10 +73,7 @@ class PyomoOptLayer(nn.Module):
                                  "This can often lead to errors in KKT evaluations.")
         if "bound_relax_factor" not in self.solver.options:
             self.solver.options["bound_relax_factor"] = 1e-08
-        # self.variables = variables
-        # self.parameter = parameters
-        # self.known_parameters = known_parameters
-        # self.free_parameters = free_parameters
+
         self.variables = self.expand_complist_to_compdata_list(variables)
         self.parameter = self.expand_complist_to_compdata_list(parameters)
         self.known_parameters = self.expand_complist_to_compdata_list(known_parameters)
@@ -93,8 +89,6 @@ class PyomoOptLayer(nn.Module):
         if varlist is None:
             return None
         if isinstance(varlist, (pyo.Component, IndexedComponent_slice)):
-            # User provided a variable, not a list of variables.
-            # Let's work with it anyway
             varlist = [varlist]
         vardatalist = []
         for var in varlist:
@@ -245,12 +239,9 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             # Each MPI process solves only its assigned batches
             for batch in local_batches:
                 params = [p[batch] for p in batch_params]  # Get batch parameters
-                # TODO single_solve(concrete_modified_model)
                 var_values = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
-                # vars = torch.tensor(vars, dtype=batch_params[0].dtype, device=batch_params[0].device).view(-1).requires_grad_(True)
                 dfullvar_dp, lhs_Jac, rhs_Jac, duals = sensitivity.get_sen(concrete_model)
                 grad = dfullvar_dp[variables_index_order, :]
-                # print("grad", grad)
                 local_primal_out.append(var_values)
                 local_dual_out.append(duals)
                 local_J.append(grad)
