@@ -6,10 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "pyomo-layers"
 version = "0.0.1"
 authors = [
-  { name="Kejun Chen", email="Kejun.Chen@nrel.gov" },
-  { name="Bernard Knueven", email="Bernard.Knueven@nrel.gov" },
+  { name="Kejun Chen", email="Kejun.Chen@nlr.gov" },
+  { name="Bernard Knueven", email="Bernard.Knueven@nlr.gov" },
 ]
-description = "Pyomo optimization layers"
+description = "Optimization Layers for Pyomo"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -32,6 +32,6 @@ test = [
 ]
 
 [project.urls]
-Homepage = "https://github.nrel.gov/MSOC/PyomoLayers"
-Issues = "https://github.nrel.gov/MSOC/PyomoLayers/issues"
+Homepage = "https://github.nrel.gov/MSOC/Optimization-Layers-for-Pyomo"
+Issues = "https://github.nrel.gov/MSOC/Optimization-Layers-for-Pyomo/issues"
 
