@@ -239,7 +239,7 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
             # Each MPI process solves only its assigned batches
             for batch in local_batches:
                 params = [p[batch] for p in batch_params]  # Get batch parameters
-                var_values = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
+                var_values = single_solve(concrete_model, variables, parameters, known_parameters, solver, params)
                 dfullvar_dp, lhs_Jac, rhs_Jac, duals = sensitivity.get_sen(concrete_model)
                 grad = dfullvar_dp[variables_index_order, :]
                 local_primal_out.append(var_values)
@@ -305,7 +305,7 @@ def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, kn
             local_results = []
             for batch in local_batches:
                 params = [p[batch] for p in batch_params]  # Get batch parameters
-                var_values = single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params)
+                var_values = single_solve(concrete_model, variables, parameters, known_parameters, solver, params)
                 local_results.append(var_values)
 
             all_results = comm.allgather(np.array(local_results))
@@ -328,8 +328,12 @@ def rank_partition(rank, size, batch_size):
     end = start + base + (1 if rank < remainder else 0)
     return list(range(start, end))
 
-def single_solve(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver, params):
-    # solve over minibatch by just iterating
+def single_solve(concrete_model, variables, parameters, known_parameters, solver, params):
+    """
+    Descriptions: 
+        Solve one Pyomo model instance for a single parameter sample.
+        Return theolved optimal variable values.
+    """
     with torch.no_grad():
         params_ = [p.detach().clone().double().numpy() for p in params]
         params_flat = np.concatenate([p.flatten() for p in params_])
