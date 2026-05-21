@@ -1,5 +1,4 @@
-# %% [markdown]
-# # QP
+# QP test
 # \begin{align}
 # \text{min}_\mathbf{x} & \frac{1}{2} \mathbf{x}^\top \mathbf{Q} \mathbf{x} + \mathbf{q}^\top\mathbf{x}, 
 # \\
@@ -8,7 +7,6 @@
 # & \mathbf{G}\mathbf{x} \leq \mathbf{h}
 # \end{align}
 # with the variable $\mathbf{x}$ and parameter $\mathbf{p}$.
-# %%
 import sys
 import os
 import datetime

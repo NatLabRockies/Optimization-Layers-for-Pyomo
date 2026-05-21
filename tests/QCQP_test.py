@@ -1,5 +1,4 @@
-# %% [markdown]
-# # QP
+# QCQP test
 # \begin{align}
 # \text{min}_\mathbf{x} & \frac{1}{2} \mathbf{x}^\top \mathbf{Q} \mathbf{x} + \mathbf{q}^\top\mathbf{x}, 
 # \\

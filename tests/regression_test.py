@@ -1,11 +1,10 @@
+# Compare the gradients
 import pytest
-
 import sys
 import os
 import numpy as np
 import datetime
 import subprocess
-
 import shutil
 
 test_dir = os.path.dirname(os.path.realpath(__file__))
