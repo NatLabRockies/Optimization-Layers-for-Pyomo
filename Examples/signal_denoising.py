@@ -1,7 +1,7 @@
-# %% [markdown]
-# # Signal denoising
-# 
-# This notebook accompanies the paper [Learning Convex Optimization Models](https://web.stanford.edu/~boyd/papers/learning_copt_models.html).
+# Signal denoising
+# This example was originally part of CVXPYlayers, available: https://github.com/cvxpy/cvxpylayers
+# The fit function is copied with modification from https://github.com/cvxpy/cvxpylayers/blob/master/examples/torch/signal_denoising.ipynb
+# This example accompanies the paper [Learning Convex Optimization Models](https://web.stanford.edu/~boyd/papers/learning_copt_models.html).
 
 # %%
 import os
