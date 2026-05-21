@@ -22,9 +22,15 @@ Interface Requirements
 4) duals_slacks_ub[i] must always be 0 if ineq_ub[i] is inf
 """
 
+###############################################################################
+# Parapint
+# Copyright 2020 National Technology & Engineering Solutions of Sandia, LLC (NTESS). 
+# Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.
+# This software is distributed under the Revised BSD License
+# Parapint also leverages a variety of third-party software packages, which have separate licensing policies.
+###############################################################################
 
 logger = logging.getLogger(__name__)
-
 
 class InteriorPointStatus(enum.Enum):
     optimal = 0
