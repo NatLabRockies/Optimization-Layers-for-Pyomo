@@ -11,8 +11,6 @@ import pyomo.environ as pyo
 import numpy as np
 from pyomolayers import PyomoOptLayer
 import torch
-import time
-import torch.nn as nn
 import matplotlib.pyplot as plt
 from utils import fit
 

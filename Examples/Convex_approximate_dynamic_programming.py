@@ -10,7 +10,6 @@ import numpy as np
 from pyomolayers import PyomoOptLayer
 import torch
 import time
-import torch.nn as nn
 import matplotlib.pyplot as plt
 from scipy.linalg import solve_discrete_are
 from scipy.linalg import sqrtm
