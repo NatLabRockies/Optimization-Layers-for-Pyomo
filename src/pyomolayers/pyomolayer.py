@@ -186,27 +186,28 @@ class PyomoOptLayer(nn.Module):
     def forward(self, *batch_params):
         """
         Descriptions:
-            The forward function which takes in the parameter values and outputs the primal variables. 
-
+            The forward function, which takes in the parameter values and outputs the primal variables. 
+            Layer.train(): train mode with gradient computation for backward
+            Layer.eval(): test mode without gradient computation
         Args:
             batch_params (Tuple(List[Tensor]), required):
                 A batch of parameter values.
         Returns:
             - primal_out: The primal variables that require gradients.
+            - lhs_J: Left-hand side KKT matrix.
+            - rhs_J: Right-hand side vector.
             - dual_out: The dual variables that do not require gradients.
-            - lhs_J: Left hand side KKT matrix.
-            - rhs_J: Right hand side vector.
 
         Return type:
             - primal_out (Tensor): :math:`(*, N_p)` where :math:`*` means the batch dimension and :math:`N_p` denotes the flattened primal variable values.
-            - dual_out (Tensor): :math:`(*, N_d)` where :math:`N_d` denotes the flattened dual variable values.
             - lhs_J (List[Matrix]): :math:`(*, )`.
             - rhs_J (List[Vector]): :math:`(*, )`.
+            - dual_out (Tensor): :math:`(*, N_d)` where :math:`N_d` denotes the flattened dual variable values.
         
         Examples:
             >>> b_batch = torch.randn(sample_num, m, dtype=torch.float64, requires_grad=True)
             >>> input_param = tuple([b_batch])
-            >>> primal_out, dual_out, _, _ = Layer(*input_param)
+            >>> primal_out, _, _, dual_out = Layer(*input_param)
             >>> primal_out.sum().backward()
             >>> print(b_batch.grad)
         """
@@ -229,7 +230,7 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
                  variables_index_order, solver, sensitivity, parameters_parent, grad_parameters_parent):
     """
     Descriptions: 
-        The forward and backward function for the PyomoOptLayer module.
+        The forward and backward functions for the PyomoOptLayer module.
     """
     class PyomoLayerFnFn(torch.autograd.Function):
         @staticmethod
@@ -300,7 +301,7 @@ def PyomoLayerFn(concrete_model, variables, parameters, parameters_size, vars_to
 def PyomoLayerFn_eval(concrete_model, variables, parameters, vars_to_indices, known_parameters, solver):
     """
     Descriptions: 
-        The forward and backward function for the PyomoOptLayer module.
+        The forward and backward functions for the PyomoOptLayer module.
     """
     class PyomoLayerFnFn_eval(torch.autograd.Function):
         @staticmethod
