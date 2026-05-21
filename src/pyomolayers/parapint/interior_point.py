@@ -28,6 +28,10 @@ Interface Requirements
 # Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.
 # This software is distributed under the Revised BSD License
 # Parapint also leverages a variety of third-party software packages, which have separate licensing policies.
+
+# This file was originally part of Parapint, available: https://github.com/sandialabs/parapint
+# Copied with modification from https://github.com/sandialabs/parapint/blob/main_branch/parapint/algorithms/interior_point.py
+# ip_solve_optimal() is the function to obtain the gradient matrix at the optimal solution.
 ###############################################################################
 
 logger = logging.getLogger(__name__)
