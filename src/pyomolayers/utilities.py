@@ -355,12 +355,15 @@ class Sensitivity:
         
         Args:
             - concrete_model (``Pyomo model``, required)
-                The concrete instance has been solved by IPOPT, and the optimal values of primal and dual variables have been obtained.
+                A solved concrete model instance. IPOPT must have already
+                computed the optimal primal and dual variable values.
+
         Returns:
-            The sensitivity matrix, left hand side of KKT matrix, right hand side of vector, and the order of variables
-        
+            The sensitivity matrix, the left-hand side KKT matrix, the
+            right-hand side vector, and the dual variables.
+
         Return type:
-            Matrix.
+            Gradient matrix, KKT matrix, right-hand side vector, dual variables matrix
         """
         # Unfix the param variables for Jac/Hessian evaluation
         for param in concrete_model.component_objects(pyo.Var):
@@ -400,6 +403,7 @@ class Sensitivity:
         if np.any(np.isnan(kkt.tocsc().data)) or np.any(np.isinf(kkt.tocsc().data)):
             raise RuntimeError("This is a runtime error")
         try:
+            # The gradient is obtained at the optimal point.
             if self.is_first_call:
                 ds, self.IPsolver = ip_solve_optimal(interface=IPOPT, kkt = kkt, rhs = -kkt_rhs.toarray(), 
                                         is_first_call = self.is_first_call, IPoptions = self.IPsolver)
