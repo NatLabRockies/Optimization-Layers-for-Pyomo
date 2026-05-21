@@ -1,43 +1,10 @@
-# %% [markdown]
-# # Convex approximate dynamic programming
-# 
-# We consider a stochastic control problem of the form
-# \begin{equation}
-# \begin{array}{ll}
-# \mbox{minimize} & \underset{T \to \infty}\lim {\mathbb E} \left[\frac{1}{T} \sum_{t=0}^{T-1} \|{x_t}\|_2^2 + \|{\phi(x_t)}\|_2^2\right]\\[.2cm]
-# \mbox{subject to} & x_{t+1} = Ax_t + B\phi(x_t) + \omega_t,
-# \end{array}
-# \label{eq:adp}
-# \end{equation}
-# where $x_t\in\mathbf{R}^n$ is the state, $\phi:\mathbf{R}^n \to \mathcal U \subseteq \mathbf{R}^m$ is
-# the policy, $\mathcal U$ is a convex set representing the allowed set of controls,
-# and $\omega_t\in\Omega$ is a (random, i.i.d.) disturbance.
-# Here the variable is the policy $\phi$, and the expectation is taken over
-# disturbances and the initial state $x_0$. If $\mathcal U$ is not an affine
-# set, then this problem is in general very difficult to solve.
-# 
-# A common heuristic for solving stochastic control problems is
-# approximate dynamic programming (ADP), which parametrizes $\phi$
-# and replaces the minimization over functions $\phi$ with a minimization over parameters.
-# In this example, we take $\mathcal U$ to be the unit ball and we represent $\phi$
-# as a particular quadratic *control-Lyapunov* policy.
-# Evaluating $\phi$ corresponds to solving the SOCP
-# \begin{equation}
-# \begin{array}{ll}
-# \mbox{minimize} & u^T P u + x_t^T Q u + q^T u \\
-# \mbox{subject to} & \|{u}\|_2 \leq 1,
-# \end{array}
-# \label{eq:policy}
-# \end{equation}
-# with variable $u$ and parameters $P$, $Q$, $q$, and $x_t$. We can run
-# gradient descent (SGD) on $P$, $Q$, and $q$ to
-# approximately solve the original problem, which requires requires differentiating
-# through the quadratic policy. Note that if $u$ were unconstrained, the original problem
-# could be solved exactly, via linear quadratic regulator (LQR) theory.
+# Convex approximate dynamic programming
+# CVXPYlayers is a Python library for constructing differentiable convex optimization layers.
+# CVXPYlayers carries an Apache 2.0 license.
+# This example was originally part of CVXPYlayers, available: https://github.com/cvxpy/cvxpylayers/blob/master/examples/torch/convex_approximate_dynamic_programming.ipynb
+# This example is rewritten in Pyomo and Pyomo Layers.
 
-# %%
 import os
-
 import pyomo.environ as pyo
 import numpy as np
 from pyomolayers import PyomoOptLayer

@@ -1,8 +1,9 @@
-# %% [markdown]
-# # Constrained MPC
-# 
-# This notebook accompanies the paper [Learning Convex Optimization Models](https://web.stanford.edu/~boyd/papers/learning_copt_models.html).
-
+# Constrained MPC example
+# CVXPYlayers is a Python library for constructing differentiable convex optimization layers.
+# CVXPYlayers carries an Apache 2.0 license.
+# This example was originally part of CVXPYlayers, available: https://github.com/cvxpy/cvxpylayers/blob/master/examples/torch/constrained_mpc.ipynb
+# This example is rewritten in Pyomo and Pyomo Layers.
+# This example accompanies the paper [Learning Convex Optimization Models](https://web.stanford.edu/~boyd/papers/learning_copt_models.html).
 # %%
 import os
 

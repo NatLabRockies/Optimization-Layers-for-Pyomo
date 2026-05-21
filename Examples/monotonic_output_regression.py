@@ -1,11 +1,12 @@
-# %% [markdown]
-# # Monotonic Output Regression
-# 
-# This notebook accompanies the paper [Learning Convex Optimization Models](https://web.stanford.edu/~boyd/papers/learning_copt_models.html).
+# Monotonic Output Regression example
+# CVXPYlayers is a Python library for constructing differentiable convex optimization layers.
+# CVXPYlayers carries an Apache 2.0 license.
+# This example was originally part of CVXPYlayers, available: https://github.com/cvxpy/cvxpylayers/blob/master/examples/torch/monotonic_output_regression.ipynb
+# This example is rewritten in Pyomo and Pyomo Layers.
+# This example accompanies the paper [Learning Convex Optimization Models](https://web.stanford.edu/~boyd/papers/learning_copt_models.html).
 
-# %%
+
 import os
-
 import pyomo.environ as pyo
 import numpy as np
 from pyomolayers import PyomoOptLayer

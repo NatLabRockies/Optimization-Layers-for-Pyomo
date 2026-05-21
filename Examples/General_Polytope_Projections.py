@@ -1,14 +1,9 @@
-# %% [markdown]
-# # General Polytope Projections
-# \begin{align}
-# \text{min}_x & \frac{1}{2}\sum_{i = 1}^{n} (x_i - p_i)^2, 
-# \\
-# \\
-# \text{s.t.} \quad & \mathbf{G} \mathbf{x} \leq \mathbf{h} \\
-# \end{align}
-# with the variable $\mathbf{x}$ and parameter $\mathbf{h}$.
+# General Polytope Projections
+# CVXPYlayers is a Python library for constructing differentiable convex optimization layers.
+# CVXPYlayers carries an Apache 2.0 license.
+# This example was originally part of CVXPYlayers, available: https://locuslab.github.io/2019-10-28-cvxpylayers/
+# This example is rewritten in Pyomo and Pyomo Layers.
 
-# %%
 import os
 import pyomo.environ as pyo
 import numpy as np

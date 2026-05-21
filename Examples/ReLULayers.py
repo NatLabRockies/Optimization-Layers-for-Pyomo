@@ -1,28 +1,8 @@
-# %% [markdown]
-# # ReLU Layers
-# 
-# We can write a ReLU layer $z = \max(Wx+b, 0)$ as the
-# convex optimization problem
-# \begin{equation}
-# \begin{array}{ll}
-# \mbox{minimize} & \|z-\tilde Wx - b\|_2^2 \\[.2cm]
-# \mbox{subject to} & z \geq 0, \\
-# & \tilde W = W,
-# \end{array}
-# \label{eq:prob}
-# \end{equation}
-# with variables $z$ and $\tilde W$,
-# and parameters $W$, $b$, and $x$.
-# (Note that we have added an extra variable $\tilde W$ so
-# that the problem is DPP.)
-# 
-# We can embed this problem into a PyTorch `Module` and use it
-# as a layer in a sequential neural network.
-# We note that this example is purely illustrative;
-# one can implement a ReLU layer much more efficiently
-# by directly performing the matrix multiplication, vector addition,
-# and then taking the positive part.
-
+# ReLU Layers example
+# CVXPYlayers is a Python library for constructing differentiable convex optimization layers.
+# CVXPYlayers carries an Apache 2.0 license.
+# This example was originally part of CVXPYlayers, available: https://github.com/cvxpy/cvxpylayers/blob/master/examples/torch/ReLU%20Layers.ipynb
+# This example is rewritten in Pyomo and Pyomo Layers.
 # %%
 import os
 

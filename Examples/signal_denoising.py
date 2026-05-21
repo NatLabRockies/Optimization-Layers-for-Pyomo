@@ -1,8 +1,11 @@
-# Signal denoising
-# This example was originally part of CVXPYlayers, available: https://github.com/cvxpy/cvxpylayers
-# The fit function is copied with modification from https://github.com/cvxpy/cvxpylayers/blob/master/examples/torch/signal_denoising.ipynb
+# Signal denoising example
+# CVXPYlayers is a Python library for constructing differentiable convex optimization layers.
+# CVXPYlayers carries an Apache 2.0 license.
+#  _________________________________________________________________________
+# This example was originally part of CVXPYlayers, available: https://github.com/cvxpy/cvxpylayers/blob/master/examples/torch/signal_denoising.ipynb
+# This example is rewritten in Pyomo and Pyomo Layers.
 # This example accompanies the paper [Learning Convex Optimization Models](https://web.stanford.edu/~boyd/papers/learning_copt_models.html).
-
+# The fit function is copied with modification from https://github.com/cvxpy/cvxpylayers/blob/master/examples/torch/signal_denoising.ipynb
 # %%
 import os
 import pyomo.environ as pyo
