@@ -1,6 +1,7 @@
-# Optimization-Layers-for-Pyomo (SWR 25-132)
+# Optimization-Layers-for-Pyomo (SWR 25-132, reference: https://www.osti.gov/doecode/biblio/183348)
 An optimization layer solves an optimization problem using Pyomo and IPOPT during the forward pass.
 It computes the gradient of the optimal solution with respect to the parameters based on the KKT conditions in the backward pass.
+
 ## Documentation
 - Source docs: [docs](docs/)
 - Build locally:
