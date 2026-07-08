@@ -343,7 +343,7 @@ def single_solve(concrete_model, variables, parameters, known_parameters, solver
         end_ = index + 1
         if known_parameters:
             for index, p_name in enumerate(known_parameters):
-                p_name[index] = params_flat[index + end_] 
+                p_name.set_value(params_flat[index + end_])
         
         result = solver.solve(concrete_model, tee=False)
         
